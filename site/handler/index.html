@@ -1,0 +1,1248 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://codeberg.org/mikolajgasior/gorestapi/handler/">
+      
+      
+        <link rel="prev" href="../demo/">
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Handler - gorestapi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="red">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#handler" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="gorestapi" class="md-header__button md-logo" aria-label="gorestapi" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gorestapi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Handler
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="gorestapi" class="md-nav__button md-logo" aria-label="gorestapi" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    gorestapi
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Demo
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Handler
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Handler
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route" class="md-nav__link">
+    <span class="md-ellipsis">
+      Route
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mounting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mounting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#url-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      URL scheme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#password-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Password fields
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      Endpoints
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-get-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      List — GET /{path}/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-get-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Read — GET /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-put-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create — PUT /{path}/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-put-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Update — PUT /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-delete-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete — DELETE /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response format
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      CORS
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initialization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#route" class="md-nav__link">
+    <span class="md-ellipsis">
+      Route
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mounting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mounting
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#url-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      URL scheme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#password-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Password fields
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      Endpoints
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-get-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      List — GET /{path}/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-get-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Read — GET /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-put-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      Create — PUT /{path}/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-put-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Update — PUT /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-delete-pathid" class="md-nav__link">
+    <span class="md-ellipsis">
+      Delete — DELETE /{path}/{id}
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#response-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Response format
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      CORS
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="handler">Handler</h1>
+<h2 id="initialization">Initialization</h2>
+<pre><code class="language-go">import (
+    &quot;codeberg.org/mikolajgasior/gorestapi&quot;
+    svccrud &quot;codeberg.org/mikolajgasior/gocrud/pkg/service&quot;
+)
+
+svc := svccrud.New(registry, dbConn, gocrud.DialectPostgres)
+
+handler := gorestapi.New(svc, gorestapi.Options{})
+</code></pre>
+<p><code>New</code> takes two arguments:</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>svc</code></td>
+<td><code>*service.CRUD</code></td>
+<td>An initialised service instance</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>gorestapi.Options</code></td>
+<td>Configuration for the handler (zero value is valid)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="options">Options</h3>
+<pre><code class="language-go">type Options struct {
+    CORS       cors.CORS
+    Routes     map[string]Route
+    UserIDFunc func(r *http.Request) uint64
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CORS</code></td>
+<td><code>cors.CORS</code></td>
+<td>CORS headers written on every response. Zero value emits no CORS headers.</td>
+</tr>
+<tr>
+<td><code>Routes</code></td>
+<td><code>map[string]Route</code></td>
+<td>Per-route configuration keyed by URL path segment. Routes absent from the map use the zero value (all operations enabled, all filters allowed).</td>
+</tr>
+<tr>
+<td><code>UserIDFunc</code></td>
+<td><code>func(*http.Request) uint64</code></td>
+<td>Called on every create and update request to obtain the current user's ID, passed to the service as <code>ModifiedBy</code>. When <code>nil</code>, <code>ModifiedBy</code> is always <code>0</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="route">Route</h3>
+<p><code>Route</code> maps a URL path segment to a service registry key and configures per-operation behavior.</p>
+<pre><code class="language-go">type Route struct {
+    RegistryKey    string
+    Flags          int64
+    AllowedFilters []string
+
+    AllowCreate func(obj interface{}, r *http.Request) error
+    AllowUpdate func(obj interface{}, r *http.Request) error
+    AllowRead   func(obj interface{}, r *http.Request) error
+    AllowDelete func(obj interface{}, r *http.Request) error
+
+    PreCreate func(obj interface{}, r *http.Request) error
+    PreUpdate func(obj interface{}, r *http.Request) error
+
+    PostRead     func(obj interface{}, r *http.Request) error
+    PostListItem func(obj interface{}, r *http.Request) error
+
+    FilterList func(r *http.Request) FilterSet
+    FilterRead func(r *http.Request) FilterSet
+
+    CreateConstructor func() interface{}
+    UpdateConstructor func() interface{}
+    ReadConstructor   func() interface{}
+    ListConstructor   func() interface{}
+}
+</code></pre>
+<p><strong>RegistryKey</strong></p>
+<p>When <code>RegistryKey</code> is empty the URL path segment is used as the service registry key. Set it explicitly when the URL path and the registry key should differ:</p>
+<pre><code class="language-go">Routes: map[string]gorestapi.Route{
+    &quot;v1/users&quot;: {RegistryKey: &quot;users&quot;},
+}
+</code></pre>
+<p><strong>Flags</strong></p>
+<p><code>Flags</code> is a bitmask that controls which operations and features are disabled for a route. Combine multiple flags with <code>|</code>. The zero value enables everything.</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Disables</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DisableCreate</code></td>
+<td><code>PUT /{path}/</code> (create) — responds <code>405</code></td>
+</tr>
+<tr>
+<td><code>DisableUpdate</code></td>
+<td><code>PUT /{path}/{id}</code> (update) — responds <code>405</code></td>
+</tr>
+<tr>
+<td><code>DisableDelete</code></td>
+<td><code>DELETE /{path}/{id}</code> — responds <code>405</code></td>
+</tr>
+<tr>
+<td><code>DisableRead</code></td>
+<td><code>GET /{path}/{id}</code> — responds <code>405</code></td>
+</tr>
+<tr>
+<td><code>DisableList</code></td>
+<td><code>GET /{path}/</code> — responds <code>405</code></td>
+</tr>
+<tr>
+<td><code>DisableFilters</code></td>
+<td>All <code>filter_val_*</code> / <code>filter_op_*</code> query parameters are ignored</td>
+</tr>
+</tbody>
+</table>
+<p><strong>AllowedFilters</strong></p>
+<p><code>AllowedFilters</code> is a whitelist of field names that clients may pass as filters. When empty all fields are allowed (unless <code>DisableFilters</code> is set). Fields not in the list are silently dropped from the request.</p>
+<pre><code class="language-go">Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {AllowedFilters: []string{&quot;UserID&quot;, &quot;Status&quot;}},
+}
+</code></pre>
+<p><strong>Authorization hooks — Allow*</strong></p>
+<p>Each <code>Allow*</code> hook is called with the loaded object and the request. Return a non-nil error to reject the operation with <code>403 Forbidden</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>When called</th>
+<th>Object passed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AllowCreate</code></td>
+<td>After the request body is unmarshalled, before saving</td>
+<td>The new object populated from the request</td>
+</tr>
+<tr>
+<td><code>AllowUpdate</code></td>
+<td>After the existing record is loaded, <strong>before</strong> the request body is applied</td>
+<td>The <strong>stored</strong> record (original state)</td>
+</tr>
+<tr>
+<td><code>AllowRead</code></td>
+<td>After the record is loaded</td>
+<td>The loaded record</td>
+</tr>
+<tr>
+<td><code>AllowDelete</code></td>
+<td>After the record is loaded, before deletion</td>
+<td>The loaded record</td>
+</tr>
+</tbody>
+</table>
+<p><code>AllowUpdate</code> receives the record as stored in the database so it reflects the original owner or state — the incoming request values have not been applied yet.</p>
+<pre><code class="language-go">noteOwner := func(obj interface{}, r *http.Request) error {
+    note := obj.(*Note)
+    headerUserID, _ := strconv.ParseUint(r.Header.Get(&quot;X-User-ID&quot;), 10, 64)
+    if note.UserID != headerUserID {
+        return errors.New(&quot;not the note owner&quot;)
+    }
+    return nil
+}
+
+Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {
+        AllowUpdate: noteOwner,
+        AllowDelete: noteOwner,
+    },
+}
+</code></pre>
+<p><strong>Server-side filters — FilterList / FilterRead</strong></p>
+<p>These hooks inject server-controlled filters into queries, merging with (and taking precedence over) any client-supplied filters so clients cannot override them.</p>
+<p><code>FilterList</code> is applied to every list request (<code>GET /{path}/</code>). <code>FilterRead</code> is applied when reading a single record by ID (<code>GET /{path}/{id}</code>); when set, the handler uses <code>List(limit=1)</code> with the ID added as an extra constraint so mismatches return <code>404</code> rather than revealing record existence.</p>
+<pre><code class="language-go">type FilterSet struct {
+    Vals map[string]string // field → value
+    Ops  map[string]string // field → operator (defaults to &quot;eq&quot; when absent)
+}
+</code></pre>
+<pre><code class="language-go">Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {
+        FilterList: func(r *http.Request) gorestapi.FilterSet {
+            return gorestapi.FilterSet{
+                Vals: map[string]string{&quot;UserID&quot;: r.Header.Get(&quot;X-User-ID&quot;)},
+            }
+        },
+        FilterRead: func(r *http.Request) gorestapi.FilterSet {
+            return gorestapi.FilterSet{
+                Vals: map[string]string{&quot;UserID&quot;: r.Header.Get(&quot;X-User-ID&quot;)},
+            }
+        },
+    },
+}
+</code></pre>
+<p><strong>Pre hooks — PreCreate / PreUpdate</strong></p>
+<p>Called with the fully-prepared object just before it is written to the database. The request body has already been applied and the ID is set. Use these to stamp server-controlled fields that should not be settable by the client.</p>
+<p>Return a non-nil error to abort the operation with <code>500 Internal Server Error</code>.</p>
+<pre><code class="language-go">Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {
+        PreCreate: func(obj interface{}, _ *http.Request) error {
+            obj.(*Note).Status = &quot;pending&quot;
+            return nil
+        },
+    },
+}
+</code></pre>
+<p><strong>Post hooks — PostRead / PostListItem</strong></p>
+<p>Called on loaded objects just before they are serialised to JSON. Use these to set or transform fields in the response that should differ from the stored values.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Fires on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PostRead</code></td>
+<td>A single-record read (<code>GET /{path}/{id}</code>)</td>
+</tr>
+<tr>
+<td><code>PostListItem</code></td>
+<td>Each item in a list response (<code>GET /{path}/</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Return a non-nil error to abort with <code>500 Internal Server Error</code>. For <code>PostListItem</code> an error aborts the entire list response.</p>
+<pre><code class="language-go">Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {
+        PostRead: func(obj interface{}, _ *http.Request) error {
+            obj.(*Note).Comment = &quot;Returned from API&quot;
+            return nil
+        },
+        PostListItem: func(obj interface{}, _ *http.Request) error {
+            obj.(*Note).Comment = &quot;Returned from API&quot;
+            return nil
+        },
+    },
+}
+</code></pre>
+<p><strong>Constructor overrides</strong></p>
+<p>By default each operation uses the constructor registered for the key in the service. Setting a constructor here overrides that for the specific operation, allowing a different struct type — for example a create-only struct with fewer fields.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CreateConstructor</code></td>
+<td><code>func() interface{}</code></td>
+<td>Constructor for <code>PUT /{path}/</code> (create)</td>
+</tr>
+<tr>
+<td><code>UpdateConstructor</code></td>
+<td><code>func() interface{}</code></td>
+<td>Constructor for <code>PUT /{path}/{id}</code> (update). The existing record is <strong>not</strong> pre-loaded; the URL id is stamped onto the object after JSON unmarshalling.</td>
+</tr>
+<tr>
+<td><code>ReadConstructor</code></td>
+<td><code>func() interface{}</code></td>
+<td>Constructor for <code>GET /{path}/{id}</code>. Only fields present on the override struct are SELECTed.</td>
+</tr>
+<tr>
+<td><code>ListConstructor</code></td>
+<td><code>func() interface{}</code></td>
+<td>Constructor for <code>GET /{path}/</code>. Only fields present on the override struct are SELECTed.</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-go">// &quot;_&quot; suffix is stripped when deriving the table name:
+//   strings.Split(&quot;Note_Draft&quot;, &quot;_&quot;)[0] = &quot;Note&quot; → table &quot;note&quot;
+type Note_Draft struct {
+    ID      uint64
+    Title   string `crud:&quot;req len:1,200&quot;`
+    Content string
+    UserID  uint64 `crud:&quot;req&quot;`
+}
+
+Routes: map[string]gorestapi.Route{
+    &quot;notes&quot;: {
+        CreateConstructor: func() interface{} { return &amp;Note_Draft{} },
+    },
+}
+</code></pre>
+<h2 id="mounting">Mounting</h2>
+<p><code>handler.Serve</code> is a standard <code>http.HandlerFunc</code>. Mount it under a prefix using <code>http.StripPrefix</code> so the handler only sees the path-relative URL:</p>
+<pre><code class="language-go">mux := http.NewServeMux()
+mux.Handle(&quot;/api/&quot;, http.StripPrefix(&quot;/api&quot;, http.HandlerFunc(handler.Serve)))
+http.ListenAndServe(&quot;:8080&quot;, mux)
+</code></pre>
+<p>After stripping the mount prefix the handler expects URLs of the form <code>/{path}/{id}</code> where <code>path</code> is a key from <code>Options.Routes</code> and <code>id</code> is an optional numeric record ID.</p>
+<h2 id="url-scheme">URL scheme</h2>
+<pre><code>/{path}/           — list / create
+/{path}/{id}       — read / update / delete
+</code></pre>
+<p><code>path</code> must match a key in <code>Options.Routes</code>. <code>id</code> must be a positive integer or absent.</p>
+<h2 id="password-fields">Password fields</h2>
+<p>Fields tagged <code>crud:"pass"</code> are <strong>never included in responses</strong> from the Read and List endpoints. The handler strips them before serialising the object to JSON, regardless of whether the struct field has a <code>json</code> tag or not.</p>
+<pre><code class="language-go">type User struct {
+    ID       uint64
+    Email    string `crud:&quot;req email&quot;`
+    Password string `crud:&quot;pass&quot;` // omitted from GET /users/ and GET /users/{id}
+}
+</code></pre>
+<h2 id="endpoints">Endpoints</h2>
+<h3 id="list-get-path">List — <code>GET /{path}/</code></h3>
+<p>Returns a paginated, filtered list of records.</p>
+<p><strong>Query parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>limit</code></td>
+<td>int</td>
+<td><code>10</code></td>
+<td>Maximum number of records to return</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td>int</td>
+<td><code>0</code></td>
+<td>Number of records to skip</td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td>string</td>
+<td>—</td>
+<td>Field name to sort by</td>
+</tr>
+<tr>
+<td><code>order_direction</code></td>
+<td>string</td>
+<td>—</td>
+<td><code>asc</code> or <code>desc</code></td>
+</tr>
+<tr>
+<td><code>filter_val_{Field}</code></td>
+<td>string</td>
+<td>—</td>
+<td>Filter value for the named field</td>
+</tr>
+<tr>
+<td><code>filter_op_{Field}</code></td>
+<td>string</td>
+<td><code>eq</code></td>
+<td>Filter operator for the named field</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Response <code>200 OK</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;code&quot;: &quot;SUCCESS&quot;,
+  &quot;data&quot;: [ { &quot;ID&quot;: 1, &quot;Title&quot;: &quot;Hello&quot;, &quot;...&quot; : &quot;...&quot; } ]
+}
+</code></pre>
+<hr />
+<h3 id="read-get-pathid">Read — <code>GET /{path}/{id}</code></h3>
+<p>Returns a single record by ID.</p>
+<p><strong>Response <code>200 OK</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;code&quot;: &quot;SUCCESS&quot;,
+  &quot;data&quot;: { &quot;ID&quot;: 42, &quot;Title&quot;: &quot;Hello&quot;, &quot;...&quot; : &quot;...&quot; }
+}
+</code></pre>
+<p><strong>Response <code>404 Not Found</code>:</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;code&quot;: &quot;NOT_FOUND&quot; }
+</code></pre>
+<hr />
+<h3 id="create-put-path">Create — <code>PUT /{path}/</code></h3>
+<p>Creates a new record. The request body must be a JSON object whose keys match the struct's field names (or <code>json</code> tags when set).</p>
+<p><strong>Request body:</strong></p>
+<pre><code class="language-json">{ &quot;Title&quot;: &quot;Hello&quot;, &quot;Content&quot;: &quot;World&quot; }
+</code></pre>
+<p><strong>Response <code>201 Created</code>:</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;code&quot;: &quot;CREATED&quot;,
+  &quot;data&quot;: { &quot;id&quot;: 42 }
+}
+</code></pre>
+<p><strong>Response <code>400 Bad Request</code></strong> (validation failure):</p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;code&quot;: &quot;VALIDATION_FAILED&quot;,
+  &quot;message&quot;: &quot;validation failed with violations: ...&quot;
+}
+</code></pre>
+<hr />
+<h3 id="update-put-pathid">Update — <code>PUT /{path}/{id}</code></h3>
+<p>Updates an existing record. The request body replaces the record's fields. Returns <code>404</code> if the record does not exist.</p>
+<p><strong>Response <code>200 OK</code>:</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;code&quot;: &quot;SUCCESS&quot;, &quot;data&quot;: { &quot;id&quot;: 42 } }
+</code></pre>
+<hr />
+<h3 id="delete-delete-pathid">Delete — <code>DELETE /{path}/{id}</code></h3>
+<p>Deletes a record by ID.</p>
+<p><strong>Response <code>200 OK</code>:</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;code&quot;: &quot;SUCCESS&quot; }
+</code></pre>
+<p><strong>Response <code>404 Not Found</code>:</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;code&quot;: &quot;NOT_FOUND&quot; }
+</code></pre>
+<hr />
+<h2 id="response-format">Response format</h2>
+<p>Every response is a JSON object with the following shape:</p>
+<pre><code class="language-json">{
+  &quot;ok&quot;:      true,
+  &quot;code&quot;:    &quot;SUCCESS&quot;,
+  &quot;message&quot;: &quot;optional human-readable detail&quot;,
+  &quot;data&quot;:    null
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ok</code></td>
+<td>bool</td>
+<td>Always <code>true</code> — use <code>code</code> to distinguish outcomes</td>
+</tr>
+<tr>
+<td><code>code</code></td>
+<td>string</td>
+<td>Machine-readable result code (see below)</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>string?</td>
+<td>Present only on errors; contains a human-readable detail</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>any?</td>
+<td>Present on successful read / list / create / update</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Response codes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>HTTP status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SUCCESS</code></td>
+<td>200</td>
+<td>Operation completed successfully</td>
+</tr>
+<tr>
+<td><code>CREATED</code></td>
+<td>201</td>
+<td>Record created</td>
+</tr>
+<tr>
+<td><code>NOT_FOUND</code></td>
+<td>404</td>
+<td>No record with the given ID</td>
+</tr>
+<tr>
+<td><code>VALIDATION_FAILED</code></td>
+<td>400</td>
+<td>Request body failed struct validation</td>
+</tr>
+<tr>
+<td><code>BAD_REQUEST</code></td>
+<td>400</td>
+<td>Malformed URL or unparseable request body</td>
+</tr>
+<tr>
+<td><code>URL_PATH_ID</code></td>
+<td>400</td>
+<td>ID segment in the URL is not a valid number</td>
+</tr>
+<tr>
+<td><code>NOT_ALLOWED</code></td>
+<td>405</td>
+<td>Operation is disabled for this route via <code>Flags</code></td>
+</tr>
+<tr>
+<td><code>FORBIDDEN</code></td>
+<td>403</td>
+<td>An <code>Allow*</code> hook rejected the request</td>
+</tr>
+<tr>
+<td><code>SERVICE_ERROR</code></td>
+<td>500</td>
+<td>Internal error from the service or a <code>Pre*</code> / <code>Post*</code> hook</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cors">CORS</h2>
+<p>Populate <code>Options.CORS</code> to emit CORS headers on every response:</p>
+<pre><code class="language-go">import (
+    &quot;codeberg.org/mikolajgasior/gorestapi&quot;
+    &quot;codeberg.org/mikolajgasior/gorestapi/pkg/cors&quot;
+)
+
+handler := gorestapi.New(svc, gorestapi.Options{
+    CORS: cors.CORS{
+        AllowOrigin:  &quot;https://app.example.com&quot;,
+        AllowHeaders: &quot;Content-Type, Authorization&quot;,
+        AllowMethods: &quot;GET, PUT, DELETE&quot;,
+        MaxAge:       3600,
+    },
+})
+</code></pre>
+<p>Leave <code>CORS</code> as its zero value to emit no CORS headers.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 Mikołaj Gąsior
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://codeberg.org/mikolajgasior/gorestapi" target="_blank" rel="noopener" title="codeberg.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6m80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3l89.3 89.4-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

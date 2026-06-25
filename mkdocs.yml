@@ -1,0 +1,21 @@
+site_name: gorestapi
+site_url: https://codeberg.org/mikolajgasior/gorestapi
+theme:
+  icon:
+    repo: fontawesome/solid/code
+  name: material
+  palette:
+    scheme: slate
+    primary: teal
+    accent: red
+nav:
+  - Overview: index.md
+  - Demo: demo.md
+  - Handler: handler.md
+
+extra:
+  social:
+    - icon: fontawesome/solid/code
+      link: https://codeberg.org/mikolajgasior/gorestapi
+
+copyright: Copyright &copy; 2024-2026 Mikołaj Gąsior
