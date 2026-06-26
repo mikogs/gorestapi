@@ -12,6 +12,7 @@ nav:
   - Overview: index.md
   - Demo: demo.md
   - Handler: handler.md
+  - JWT: jwt.md
 
 extra:
   social:

@@ -4,6 +4,9 @@ go 1.25.6
 
 require (
 	codeberg.org/mikolajgasior/gocrud v0.33.0
+	github.com/go-jose/go-jose/v3 v3.0.4
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/ory/dockertest/v3 v3.12.0
 	modernc.org/sqlite v1.51.0
 )
@@ -23,7 +26,6 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/lib/pq v1.12.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mikolajgasior/struct-validator v0.10.0 // indirect
