@@ -3,7 +3,7 @@ module codeberg.org/mikolajgasior/gorestapi
 go 1.25.6
 
 require (
-	codeberg.org/mikolajgasior/gocrud v0.33.0
+	codeberg.org/mikolajgasior/gocrud v0.34.0
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

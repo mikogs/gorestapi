@@ -1,5 +1,7 @@
 codeberg.org/mikolajgasior/gocrud v0.33.0 h1:WalRdOokFSEiQn8GWhebOgulohisFRPMQD6MnabRdNE=
 codeberg.org/mikolajgasior/gocrud v0.33.0/go.mod h1:wAmqrlb3sxccEcGiOx6g3AjJI82OrwolOL3GlTl/nqM=
+codeberg.org/mikolajgasior/gocrud v0.34.0 h1:xQb6ciemz4GzECk2Ue9ql586JNb7VRfrygSgHOKERxM=
+codeberg.org/mikolajgasior/gocrud v0.34.0/go.mod h1:wAmqrlb3sxccEcGiOx6g3AjJI82OrwolOL3GlTl/nqM=
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
