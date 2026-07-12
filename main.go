@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"codeberg.org/mikolajgasior/gorestapi/pkg/cors"
-	svccrud "codeberg.org/mikolajgasior/gocrud/pkg/service"
+	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gorestapi/pkg/cors"
 )
 
 const (

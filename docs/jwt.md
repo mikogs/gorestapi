@@ -7,7 +7,7 @@ The `pkg/jwt` package provides RS256-based JSON Web Token issuance and verificat
 `NewProvider` generates a fresh 2048-bit RSA key pair and pre-builds the JWKS document:
 
 ```go
-import pkgjwt "codeberg.org/mikolajgasior/gorestapi/pkg/jwt"
+import pkgjwt "github.com/mikolajgasior/gorestapi/pkg/jwt"
 
 p, err := pkgjwt.NewProvider("https://auth.example.com")
 if err != nil {
@@ -157,7 +157,7 @@ import (
     "net/http"
     "strings"
 
-    pkgjwt "codeberg.org/mikolajgasior/gorestapi/pkg/jwt"
+    pkgjwt "github.com/mikolajgasior/gorestapi/pkg/jwt"
 )
 
 const audience = "myapp"

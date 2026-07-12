@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gorestapi/pkg/jsonresp"
-	"codeberg.org/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikolajgasior/gocrud"
+	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
 )
 
 // Minimal struct variants that map to test_struct via the existing "_" name-stripping:

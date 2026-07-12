@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gocrud/pkg/service"
-	"codeberg.org/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikolajgasior/gocrud"
+	"github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gocrud/pkg/test"
 	"github.com/ory/dockertest/v3"
 )
 

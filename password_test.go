@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gocrud"
+	"github.com/mikolajgasior/gocrud/pkg/service"
 )
 
 // PassStruct — no json tags on the password field.

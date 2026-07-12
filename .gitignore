@@ -1,2 +1,3 @@
 .idea
-/poc
+go.work
+go.work.sum

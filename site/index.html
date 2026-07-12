@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://codeberg.org/mikolajgasior/gorestapi/">
+        <link rel="canonical" href="https://github.com/mikolajgasior/gorestapi/">
       
       
       
@@ -458,7 +458,7 @@
 
 
 <h1 id="overview">Overview</h1>
-<p><strong>gorestapi</strong> is a Go package that mounts a ready-made JSON REST API on top of a <a href="https://codeberg.org/mikolajgasior/gocrud">gocrud</a> service. A single handler covers list, read, create, update, and delete for every route you register — with no code generation and no framework lock-in.</p>
+<p><strong>gorestapi</strong> is a Go package that mounts a ready-made JSON REST API on top of a <a href="https://github.com/mikolajgasior/gocrud">gocrud</a> service. A single handler covers list, read, create, update, and delete for every route you register — with no code generation and no framework lock-in.</p>
 <h2 id="how-it-works">How it works</h2>
 <ol>
 <li>Define your structs and register them with a gocrud service.</li>
@@ -466,8 +466,8 @@
 <li>Mount the handler on any <code>http.ServeMux</code>.</li>
 </ol>
 <pre><code class="language-go">import (
-    &quot;codeberg.org/mikolajgasior/gorestapi&quot;
-    svccrud &quot;codeberg.org/mikolajgasior/gocrud/pkg/service&quot;
+    &quot;github.com/mikolajgasior/gorestapi&quot;
+    svccrud &quot;github.com/mikolajgasior/gocrud/pkg/service&quot;
 )
 
 svc := svccrud.New(registry, db, gocrud.DialectPostgres)
@@ -539,7 +539,7 @@ mux.Handle(&quot;/api/&quot;, http.StripPrefix(&quot;/api&quot;, http.HandlerFun
 </tbody>
 </table>
 <h2 id="installation">Installation</h2>
-<pre><code>go get codeberg.org/mikolajgasior/gorestapi
+<pre><code>go get github.com/mikolajgasior/gorestapi
 </code></pre>
 <h2 id="demo">Demo</h2>
 <p>See <a href="demo/">Demo</a> for a complete runnable example covering two resources, ownership hooks, and server-side filters.</p>
@@ -594,7 +594,7 @@ mux.Handle(&quot;/api/&quot;, http.StripPrefix(&quot;/api&quot;, http.HandlerFun
       
       
     
-    <a href="https://codeberg.org/mikolajgasior/gorestapi" target="_blank" rel="noopener" title="codeberg.org" class="md-social__link">
+    <a href="https://github.com/mikolajgasior/gorestapi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6m80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3l89.3 89.4-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3"/></svg>
     </a>
   

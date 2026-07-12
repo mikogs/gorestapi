@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"codeberg.org/mikolajgasior/gorestapi/pkg/jsonresp"
-	svccrud "codeberg.org/mikolajgasior/gocrud/pkg/service"
+	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {

@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gorestapi/pkg/jsonreq"
-	"codeberg.org/mikolajgasior/gorestapi/pkg/jsonresp"
-	svccrud "codeberg.org/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gocrud"
+	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gorestapi/pkg/jsonreq"
+	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {

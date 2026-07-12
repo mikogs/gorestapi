@@ -4,8 +4,8 @@
 
 ```go
 import (
-    "codeberg.org/mikolajgasior/gorestapi"
-    svccrud "codeberg.org/mikolajgasior/gocrud/pkg/service"
+    "github.com/mikolajgasior/gorestapi"
+    svccrud "github.com/mikolajgasior/gocrud/pkg/service"
 )
 
 svc := svccrud.New(registry, dbConn, gocrud.DialectPostgres)
@@ -409,8 +409,8 @@ Populate `Options.CORS` to emit CORS headers on every response:
 
 ```go
 import (
-    "codeberg.org/mikolajgasior/gorestapi"
-    "codeberg.org/mikolajgasior/gorestapi/pkg/cors"
+    "github.com/mikolajgasior/gorestapi"
+    "github.com/mikolajgasior/gorestapi/pkg/cors"
 )
 
 handler := gorestapi.New(svc, gorestapi.Options{

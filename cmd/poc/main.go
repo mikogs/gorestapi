@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gorestapi"
-	svccrud "codeberg.org/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gocrud"
+	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikolajgasior/gorestapi"
 	_ "modernc.org/sqlite"
 )
 

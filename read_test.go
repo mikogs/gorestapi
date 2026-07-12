@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"codeberg.org/mikolajgasior/gocrud"
-	"codeberg.org/mikolajgasior/gorestapi/pkg/jsonresp"
-	"codeberg.org/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikolajgasior/gocrud"
+	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
 )
 
 func TestServe_Read(t *testing.T) {

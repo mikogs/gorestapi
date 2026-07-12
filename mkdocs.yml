@@ -1,5 +1,5 @@
 site_name: gorestapi
-site_url: https://codeberg.org/mikolajgasior/gorestapi
+site_url: https://github.com/mikolajgasior/gorestapi
 theme:
   icon:
     repo: fontawesome/solid/code
@@ -17,6 +17,6 @@ nav:
 extra:
   social:
     - icon: fontawesome/solid/code
-      link: https://codeberg.org/mikolajgasior/gorestapi
+      link: https://github.com/mikolajgasior/gorestapi
 
 copyright: Copyright &copy; 2024-2026 Mikołaj Gąsior
