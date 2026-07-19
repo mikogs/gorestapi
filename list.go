@@ -78,7 +78,7 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 		}
 	}
 
-	objs, err := h.svc.List(ctx, key, limit, offset, order, orderDirection, filterVals, filterOps, nil, route.ListConstructor)
+	objs, _, err := h.svc.List(ctx, key, limit, offset, order, orderDirection, filterVals, filterOps, nil, route.ListConstructor, nil)
 	if err != nil {
 		var validErr *svccrud.FilterValidationError
 		if errors.As(err, &validErr) {

@@ -34,7 +34,7 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 		}
 		filterVals["ID"] = id // ID constraint always wins
 
-		objs, listErr := h.svc.List(ctx, key, 1, 0, "", "", filterVals, filterOps, nil, route.ReadConstructor)
+		objs, _, listErr := h.svc.List(ctx, key, 1, 0, "", "", filterVals, filterOps, nil, route.ReadConstructor, nil)
 		if listErr != nil {
 			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
 				Ok:   true,
