@@ -1,7 +1,3 @@
-github.com/mikolajgasior/gocrud v0.33.0 h1:WalRdOokFSEiQn8GWhebOgulohisFRPMQD6MnabRdNE=
-github.com/mikolajgasior/gocrud v0.33.0/go.mod h1:wAmqrlb3sxccEcGiOx6g3AjJI82OrwolOL3GlTl/nqM=
-github.com/mikolajgasior/gocrud v0.34.0 h1:xQb6ciemz4GzECk2Ue9ql586JNb7VRfrygSgHOKERxM=
-github.com/mikolajgasior/gocrud v0.34.0/go.mod h1:wAmqrlb3sxccEcGiOx6g3AjJI82OrwolOL3GlTl/nqM=
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
@@ -58,6 +54,8 @@ github.com/lib/pq v1.12.0 h1:mC1zeiNamwKBecjHarAr26c/+d8V5w/u4J0I/yASbJo=
 github.com/lib/pq v1.12.0/go.mod h1:/p+8NSbOcwzAEI7wiMXFlgydTwcgTr3OSKMsD2BitpA=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
+github.com/mikolajgasior/gocrud v0.37.0 h1:gVuA9iGH87gCz8ctFB8aJDsTupU3smeyGs+Or01ccZ8=
+github.com/mikolajgasior/gocrud v0.37.0/go.mod h1:N/b1W8mB902HMjx/iCrTfRPlu6IcJEceq2T4tHDqV7k=
 github.com/mikolajgasior/struct-validator v0.10.0 h1:B/4yYwuZcQj/vBihdwLSPH15xVwRqEZKoqhJlqKC3m4=
 github.com/mikolajgasior/struct-validator v0.10.0/go.mod h1:ohe07bIkmBIX7N0f+mmPrpqX+bs+w32hxQ5Zwvi4Fyk=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=

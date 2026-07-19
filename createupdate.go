@@ -30,7 +30,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 
 		// Use the override constructor — skip reading the existing record.
 		// The URL id is authoritative; any id in the JSON body is overwritten below.
-		obj, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor)
+		obj, _, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor, nil)
 		if err != nil {
 			if errors.Is(err, svccrud.NotFoundError) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{

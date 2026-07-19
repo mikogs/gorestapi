@@ -21,7 +21,7 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if route.AllowDelete != nil {
-		obj, err := h.svc.Read(ctx, key, idInt, nil)
+		obj, _, err := h.svc.Read(ctx, key, idInt, nil, nil)
 		if err != nil {
 			if errors.Is(err, svccrud.NotFoundError) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
