@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/test"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 // Minimal struct variants that map to test_struct via the existing "_" name-stripping:
@@ -19,12 +19,12 @@ import (
 
 type TestStruct_Create struct {
 	ID  uint64
-	Key string `crud:"req uniq len:30,255"`
+	Key string `crud:"uniq" validate:"required,min=30,max=255"`
 }
 
 type TestStruct_Update struct {
 	ID        uint64
-	FirstName string `crud:"req len:2,30"`
+	FirstName string `validate:"required,min=2,max=30"`
 }
 
 type TestStruct_ReadOnly struct {

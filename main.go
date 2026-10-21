@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"regexp"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/cors"
+	svccrud "github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gorestapi/pkg/cors"
 )
 
 const (

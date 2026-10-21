@@ -9,26 +9,26 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/service"
 )
 
 // PassStruct — no json tags on the password field.
 // Table name: FieldToColumn("PassStruct") = "pass_struct"
 type PassStruct struct {
 	ID       uint64
-	Name     string `crud:"req len:1,100"`
+	Name     string `validate:"required,min=1,max=100"`
 	Password string `crud:"pass"`
-	Key      string `crud:"req uniq len:1,255"`
+	Key      string `crud:"uniq" validate:"required,min=1,max=255"`
 }
 
 // PassStructJson — password field carries a json tag.
 // "PassStructJson" has no underscore → table "pass_struct_json"
 type PassStructJson struct {
 	ID       uint64
-	Name     string `crud:"req len:1,100"`
+	Name     string `validate:"required,min=1,max=100"`
 	Password string `crud:"pass" json:"password"`
-	Key      string `crud:"req uniq len:1,255"`
+	Key      string `crud:"uniq" validate:"required,min=1,max=255"`
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────

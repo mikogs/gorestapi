@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/test"
 )
 
 // insertTestStructsWithEmail inserts n records with the given PrimaryEmail.

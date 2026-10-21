@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gocrud/pkg/test"
 	"github.com/ory/dockertest/v3"
 )
 

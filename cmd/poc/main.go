@@ -13,48 +13,32 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mikolajgasior/gocrud"
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi"
+	"github.com/mikogs/gocrud"
+	svccrud "github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gorestapi"
 	_ "modernc.org/sqlite"
 )
 
 type User struct {
 	ID         uint64
-	Name       string `crud:"req len:1,100"`
-	Email      string `crud:"req email uniq"`
-	CreatedAt  int64
+	Name       string `validate:"required,max=100"`
+	Email      string `validate:"required,email" crud:"uniq"`
+	CreatedAt  time.Time
 	CreatedBy  uint64
-	ModifiedAt int64
+	ModifiedAt time.Time
 	ModifiedBy uint64
-}
-
-// User_Draft is the create payload; the underscore tells gocrud to use the "user" table.
-type User_Draft struct {
-	ID    uint64
-	Name  string `crud:"req len:1,100"`
-	Email string `crud:"req email uniq"`
 }
 
 type Note struct {
 	ID         uint64
-	Title      string `crud:"req len:1,200"`
+	Title      string `validate:"required,max=200"`
 	Content    string
 	Comment    string
-	UserID     uint64 `crud:"req"`
-	CreatedAt  int64
+	UserID     uint64 `validate:"required" crud:"idx fk:user on_delete:cascade"`
+	CreatedAt  time.Time
 	CreatedBy  uint64
-	ModifiedAt int64
+	ModifiedAt time.Time
 	ModifiedBy uint64
-}
-
-// Note_Draft is the create payload; the underscore tells gocrud to use the "note" table.
-type Note_Draft struct {
-	ID      uint64
-	Title   string `crud:"req len:1,200"`
-	Content string
-	Comment string
-	UserID  uint64 `crud:"req"`
 }
 
 func main() {
@@ -68,7 +52,8 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// SQLite checks foreign keys only when they are enabled for the connection
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)")
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
@@ -80,8 +65,9 @@ func main() {
 		"notes": func() interface{} { return &Note{} },
 	}, db, gocrud.DialectSQLite)
 
-	if err := svc.CreateTables(context.Background()); err != nil {
-		slog.Error("failed to create tables", "error", err)
+	// Migrate creates the tables, and adds the columns of new fields to existing ones
+	if _, err := svc.Migrate(context.Background()); err != nil {
+		slog.Error("failed to migrate tables", "error", err)
 		os.Exit(1)
 	}
 
@@ -93,12 +79,7 @@ func main() {
 
 	// noteComment stamps every create and update with a server-controlled comment.
 	noteComment := func(obj interface{}, _ *http.Request) error {
-		switch n := obj.(type) {
-		case *Note:
-			n.Comment = "Added with API"
-		case *Note_Draft:
-			n.Comment = "Added with API"
-		}
+		obj.(*Note).Comment = "Added with API"
 		return nil
 	}
 
@@ -115,16 +96,15 @@ func main() {
 	handler := gorestapi.New(svc, gorestapi.Options{
 		UserIDFunc: userIDFromRequest,
 		Routes: map[string]gorestapi.Route{
-			"users": {
-				CreateConstructor: func() interface{} { return &User_Draft{} },
-			},
+			// The audit fields (CreatedAt, CreatedBy, ModifiedAt, ModifiedBy) are set by gocrud,
+			// which ignores the values sent by clients.
+			"users": {},
 			"notes": {
-				CreateConstructor: func() interface{} { return &Note_Draft{} },
-				AllowedFilters:    []string{"UserID"},
-				AllowUpdate:       noteOwner,
-				AllowDelete:       noteOwner,
-				PreCreate:         noteComment,
-				PreUpdate:         noteComment,
+				AllowedFilters: []string{"UserID"},
+				AllowUpdate:    noteOwner,
+				AllowDelete:    noteOwner,
+				PreCreate:      noteComment,
+				PreUpdate:      noteComment,
 				PostRead: func(obj interface{}, _ *http.Request) error {
 					obj.(*Note).Comment = "Returned from gocrud"
 					return nil

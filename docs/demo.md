@@ -1,67 +1,55 @@
 # Demo
 
-The `cmd/poc` directory contains a self-contained runnable server that demonstrates the most common gorestapi patterns: two resources, a create-only struct, ownership guards, and server-side filters. The walkthrough below follows that code.
+The `cmd/poc` directory contains a self-contained runnable server that demonstrates the most common gorestapi patterns: two resources related by a foreign key, ownership guards, and server-side filters. The walkthrough below follows that code.
 
 ## Resources
 
-Two structs are defined — `User` and `Note`. Each has a paired `_Draft` type used as the create payload; gocrud strips the underscore suffix to map it to the same table.
+Two structs are defined — `User` and `Note`. A note belongs to a user through a foreign key.
 
 ```go
 type User struct {
     ID         uint64
-    Name       string `crud:"req len:1,100"`
-    Email      string `crud:"req email uniq"`
-    CreatedAt  int64
+    Name       string `validate:"required,max=100"`
+    Email      string `validate:"required,email" crud:"uniq"`
+    CreatedAt  time.Time
     CreatedBy  uint64
-    ModifiedAt int64
+    ModifiedAt time.Time
     ModifiedBy uint64
-}
-
-// User_Draft is the create payload — maps to the "user" table.
-type User_Draft struct {
-    ID    uint64
-    Name  string `crud:"req len:1,100"`
-    Email string `crud:"req email uniq"`
 }
 
 type Note struct {
     ID         uint64
-    Title      string `crud:"req len:1,200"`
+    Title      string `validate:"required,max=200"`
     Content    string
     Comment    string
-    UserID     uint64 `crud:"req"`
-    CreatedAt  int64
+    UserID     uint64 `validate:"required" crud:"idx fk:user on_delete:cascade"`
+    CreatedAt  time.Time
     CreatedBy  uint64
-    ModifiedAt int64
+    ModifiedAt time.Time
     ModifiedBy uint64
-}
-
-// Note_Draft is the create payload — maps to the "note" table.
-type Note_Draft struct {
-    ID      uint64
-    Title   string `crud:"req len:1,200"`
-    Content string
-    Comment string
-    UserID  uint64 `crud:"req"`
 }
 ```
 
-The `_Draft` types intentionally omit audit fields (`CreatedAt`, `ModifiedAt`, etc.) so clients cannot set them directly.
+* The `validate` tags are checked on every create and update, and a failure is returned as `400 VALIDATION_FAILED`.
+* `crud:"uniq"` makes the email unique. A second user with the same email is rejected with `409 UNIQUE_VIOLATION`.
+* `fk:user on_delete:cascade` makes `UserID` reference a user. A note of a user that does not exist is rejected with `409 FOREIGN_KEY_VIOLATION`, and deleting a user deletes their notes.
+* `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` are set by gocrud, from the time of the request and the user returned by `UserIDFunc`. Values sent by clients are ignored, and an update never changes `CreatedAt` and `CreatedBy`.
 
 ## Database and service
 
 ```go
-db, _ := sql.Open("sqlite", dbPath)
+// SQLite checks foreign keys only when they are enabled for the connection
+db, _ := sql.Open("sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)")
 
 svc := svccrud.New(map[string]func() interface{}{
     "users": func() interface{} { return &User{} },
     "notes": func() interface{} { return &Note{} },
 }, db, gocrud.DialectSQLite)
 
-svc.CreateTables(context.Background())
+svc.Migrate(context.Background())
 ```
 
-`CreateTables` creates both tables if they do not already exist. The service registry maps URL path segments to their constructors.
+`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The service registry maps URL path segments to their constructors.
 
 ## Hooks
 
@@ -71,12 +59,7 @@ Two hooks shape note behavior.
 
 ```go
 noteComment := func(obj interface{}, _ *http.Request) error {
-    switch n := obj.(type) {
-    case *Note:
-        n.Comment = "Added with API"
-    case *Note_Draft:
-        n.Comment = "Added with API"
-    }
+    obj.(*Note).Comment = "Added with API"
     return nil
 }
 ```
@@ -105,22 +88,19 @@ handler := gorestapi.New(svc, gorestapi.Options{
         return id
     },
     Routes: map[string]gorestapi.Route{
-        "users": {
-            CreateConstructor: func() interface{} { return &User_Draft{} },
-        },
+        "users": {},
         "notes": {
-            CreateConstructor: func() interface{} { return &Note_Draft{} },
-            AllowedFilters:    []string{"UserID"},
-            AllowUpdate:       noteOwner,
-            AllowDelete:       noteOwner,
-            PreCreate:         noteComment,
-            PreUpdate:         noteComment,
+            AllowedFilters: []string{"UserID"},
+            AllowUpdate:    noteOwner,
+            AllowDelete:    noteOwner,
+            PreCreate:      noteComment,
+            PreUpdate:      noteComment,
             PostRead: func(obj interface{}, _ *http.Request) error {
-                obj.(*Note).Comment = "Returned from gorestapi"
+                obj.(*Note).Comment = "Returned from gocrud"
                 return nil
             },
             PostListItem: func(obj interface{}, _ *http.Request) error {
-                obj.(*Note).Comment = "Returned from gorestapi"
+                obj.(*Note).Comment = "Returned from gocrud"
                 return nil
             },
             FilterList: func(r *http.Request) gorestapi.FilterSet {
@@ -204,3 +184,7 @@ curl -s -X DELETE http://localhost:8080/api/notes/1 \
 | `PUT /api/notes/` | Creates a note; `Comment` is stamped by `PreCreate` |
 | `PUT /api/notes/1` | Updates a note; returns 403 if the caller is not the owner |
 | `DELETE /api/notes/1` | Deletes a note; returns 403 if the caller is not the owner |
+| `PUT /api/users/` with an invalid email | Returns 400 `VALIDATION_FAILED`, with `{"Email": "email"}` in `data` |
+| `PUT /api/users/` with an email of another user | Returns 409 `UNIQUE_VIOLATION` |
+| `PUT /api/notes/` with the `UserID` of a user that does not exist | Returns 409 `FOREIGN_KEY_VIOLATION` |
+| `DELETE /api/users/1` | Deletes the user and, through the foreign key, their notes |

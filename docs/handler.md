@@ -4,8 +4,8 @@
 
 ```go
 import (
-    "github.com/mikolajgasior/gorestapi"
-    svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+    "github.com/mikogs/gorestapi"
+    svccrud "github.com/mikogs/gocrud/pkg/service"
 )
 
 svc := svccrud.New(registry, dbConn, gocrud.DialectPostgres)
@@ -33,8 +33,8 @@ type Options struct {
 | Field | Type | Description |
 |---|---|---|
 | `CORS` | `cors.CORS` | CORS headers written on every response. Zero value emits no CORS headers. |
-| `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Routes absent from the map use the zero value (all operations enabled, all filters allowed). |
-| `UserIDFunc` | `func(*http.Request) uint64` | Called on every create and update request to obtain the current user's ID, passed to the service as `ModifiedBy`. When `nil`, `ModifiedBy` is always `0`. |
+| `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Only the paths in the map are served, other paths return `404`. A route with the zero value has all operations enabled and all filters allowed, e.g. `"notes": {}`. |
+| `UserIDFunc` | `func(*http.Request) uint64` | Called on every create and update request to obtain the current user's ID, passed to the service as `ModifiedBy`. When `nil`, `ModifiedBy` is always `0`. When the struct has the `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` fields, gocrud sets them from this ID and the time of the request, ignores the values sent in the request body, and never changes `CreatedAt` and `CreatedBy` on an update. |
 
 ### Route
 
@@ -163,7 +163,7 @@ Routes: map[string]gorestapi.Route{
 
 **Pre hooks — PreCreate / PreUpdate**
 
-Called with the fully-prepared object just before it is written to the database. The request body has already been applied and the ID is set. Use these to stamp server-controlled fields that should not be settable by the client.
+Called with the fully-prepared object just before it is written to the database. The request body has already been applied, and the ID is the one from the URL for an update, and `0` for a create. Use these to stamp server-controlled fields that should not be settable by the client.
 
 Return a non-nil error to abort the operation with `500 Internal Server Error`.
 
@@ -206,12 +206,12 @@ Routes: map[string]gorestapi.Route{
 
 **Constructor overrides**
 
-By default each operation uses the constructor registered for the key in the service. Setting a constructor here overrides that for the specific operation, allowing a different struct type — for example a create-only struct with fewer fields.
+By default each operation uses the constructor registered for the key in the service. Setting a constructor here overrides that for the specific operation, allowing a different struct type — for example a create-only struct with fewer fields, so that clients cannot set the other fields when they create a record. The audit fields do not need it, as gocrud ignores the values sent for them.
 
 | Field | Type | Description |
 |---|---|---|
 | `CreateConstructor` | `func() interface{}` | Constructor for `PUT /{path}/` (create) |
-| `UpdateConstructor` | `func() interface{}` | Constructor for `PUT /{path}/{id}` (update). The existing record is **not** pre-loaded; the URL id is stamped onto the object after JSON unmarshalling. |
+| `UpdateConstructor` | `func() interface{}` | Constructor for `PUT /{path}/{id}` (update). The existing record is loaded into this struct, and the request body is applied to it. |
 | `ReadConstructor` | `func() interface{}` | Constructor for `GET /{path}/{id}`. Only fields present on the override struct are SELECTed. |
 | `ListConstructor` | `func() interface{}` | Constructor for `GET /{path}/`. Only fields present on the override struct are SELECTed. |
 
@@ -220,9 +220,9 @@ By default each operation uses the constructor registered for the key in the ser
 //   strings.Split("Note_Draft", "_")[0] = "Note" → table "note"
 type Note_Draft struct {
     ID      uint64
-    Title   string `crud:"req len:1,200"`
+    Title   string `validate:"required,max=200"`
     Content string
-    UserID  uint64 `crud:"req"`
+    UserID  uint64 `validate:"required"`
 }
 
 Routes: map[string]gorestapi.Route{
@@ -251,7 +251,7 @@ After stripping the mount prefix the handler expects URLs of the form `/{path}/{
 /{path}/{id}       — read / update / delete
 ```
 
-`path` must match a key in `Options.Routes`. `id` must be a positive integer or absent.
+`path` must match a key in `Options.Routes`. `id` must be a number or absent, otherwise the response is `400 URL_PATH_ID`.
 
 ## Password fields
 
@@ -260,7 +260,7 @@ Fields tagged `crud:"pass"` are **never included in responses** from the Read an
 ```go
 type User struct {
     ID       uint64
-    Email    string `crud:"req email"`
+    Email    string `validate:"required,email"`
     Password string `crud:"pass"` // omitted from GET /users/ and GET /users/{id}
 }
 ```
@@ -278,9 +278,13 @@ Returns a paginated, filtered list of records.
 | `limit` | int | `10` | Maximum number of records to return |
 | `offset` | int | `0` | Number of records to skip |
 | `order` | string | — | Field name to sort by |
-| `order_direction` | string | — | `asc` or `desc` |
+| `order_direction` | string | — | `asc` or `desc`, in any letter case |
 | `filter_val_{Field}` | string | — | Filter value for the named field |
-| `filter_op_{Field}` | string | `eq` | Filter operator for the named field |
+| `filter_op_{Field}` | string | `eq` | Filter operator for the named field: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `like`, `match` (PostgreSQL only), `bit` or `in` |
+
+Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`. Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud service](https://mikogs.github.io/gocrud/pkgs/service/) for the details.
+
+An invalid filter value is a `400 VALIDATION_FAILED` response, with the failed rules in `data`.
 
 **Response `200 OK`:**
 ```json
@@ -290,6 +294,8 @@ Returns a paginated, filtered list of records.
   "data": [ { "ID": 1, "Title": "Hello", "..." : "..." } ]
 }
 ```
+
+When no records match, `data` is an empty list, `[]`.
 
 ---
 
@@ -315,7 +321,7 @@ Returns a single record by ID.
 
 ### Create — `PUT /{path}/`
 
-Creates a new record. The request body must be a JSON object whose keys match the struct's field names (or `json` tags when set).
+Creates a new record. The request body must be a JSON object whose keys match the struct's field names (or `json` tags when set). An `ID` in the body is ignored, so a create cannot overwrite an existing record.
 
 **Request body:**
 ```json
@@ -331,20 +337,23 @@ Creates a new record. The request body must be a JSON object whose keys match th
 }
 ```
 
-**Response `400 Bad Request`** (validation failure):
+**Response `400 Bad Request`** (validation failure). `data` maps the fields that failed to the names of the failed [validation rules](https://mikogs.github.io/gocrud/struct/#validation-errors):
 ```json
 {
   "ok": true,
   "code": "VALIDATION_FAILED",
-  "message": "validation failed with violations: ..."
+  "message": "validation failed with violations: map[Email:email]",
+  "data": { "Email": "email" }
 }
 ```
+
+**Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, and `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist.
 
 ---
 
 ### Update — `PUT /{path}/{id}`
 
-Updates an existing record. The request body replaces the record's fields. Returns `404` if the record does not exist.
+Updates an existing record. The request body replaces the record's fields. Returns `404` if the record does not exist. The record is the one of the `id` in the URL: an `ID` in the body is ignored, so an update cannot write to another record.
 
 **Response `200 OK`:**
 ```json
@@ -367,6 +376,8 @@ Deletes a record by ID.
 { "ok": true, "code": "NOT_FOUND" }
 ```
 
+**Response `409 Conflict`**: `FOREIGN_KEY_VIOLATION` when other records reference the record with a foreign key that does not allow deleting it. Records referenced with `on_delete:cascade` are deleted along with it.
+
 ---
 
 ## Response format
@@ -387,7 +398,7 @@ Every response is a JSON object with the following shape:
 | `ok` | bool | Always `true` — use `code` to distinguish outcomes |
 | `code` | string | Machine-readable result code (see below) |
 | `message` | string? | Present only on errors; contains a human-readable detail |
-| `data` | any? | Present on successful read / list / create / update |
+| `data` | any? | Present on successful read / list / create / update, and on validation failures |
 
 **Response codes:**
 
@@ -396,8 +407,10 @@ Every response is a JSON object with the following shape:
 | `SUCCESS` | 200 | Operation completed successfully |
 | `CREATED` | 201 | Record created |
 | `NOT_FOUND` | 404 | No record with the given ID |
-| `VALIDATION_FAILED` | 400 | Request body failed struct validation |
-| `BAD_REQUEST` | 400 | Malformed URL or unparseable request body |
+| `VALIDATION_FAILED` | 400 | Request body or a filter failed struct validation |
+| `UNIQUE_VIOLATION` | 409 | A unique field already has the value |
+| `FOREIGN_KEY_VIOLATION` | 409 | The record references a record that does not exist, or is referenced by other records |
+| `BAD_REQUEST` | 400 | Malformed URL, unparseable request body, or a method that is not supported for the URL, e.g. `PATCH`, or `DELETE` without an id |
 | `URL_PATH_ID` | 400 | ID segment in the URL is not a valid number |
 | `NOT_ALLOWED` | 405 | Operation is disabled for this route via `Flags` |
 | `FORBIDDEN` | 403 | An `Allow*` hook rejected the request |
@@ -409,8 +422,8 @@ Populate `Options.CORS` to emit CORS headers on every response:
 
 ```go
 import (
-    "github.com/mikolajgasior/gorestapi"
-    "github.com/mikolajgasior/gorestapi/pkg/cors"
+    "github.com/mikogs/gorestapi"
+    "github.com/mikogs/gorestapi/pkg/cors"
 )
 
 handler := gorestapi.New(svc, gorestapi.Options{
@@ -423,4 +436,4 @@ handler := gorestapi.New(svc, gorestapi.Options{
 })
 ```
 
-Leave `CORS` as its zero value to emit no CORS headers.
+Each header is written only when its field is set. Set `AllowCredentials: true` to emit `Access-Control-Allow-Credentials: true`. Leave `CORS` as its zero value to emit no CORS headers. `OPTIONS` requests to any path are answered with `204 No Content` and the CORS headers.

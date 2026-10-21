@@ -7,7 +7,7 @@ The `pkg/jwt` package provides RS256-based JSON Web Token issuance and verificat
 `NewProvider` generates a fresh 2048-bit RSA key pair and pre-builds the JWKS document:
 
 ```go
-import pkgjwt "github.com/mikolajgasior/gorestapi/pkg/jwt"
+import pkgjwt "github.com/mikogs/gorestapi/pkg/jwt"
 
 p, err := pkgjwt.NewProvider("https://auth.example.com")
 if err != nil {
@@ -30,6 +30,7 @@ func (p *Provider) Issuer()     string
 func (p *Provider) PrivateKey() *rsa.PrivateKey
 func (p *Provider) PublicKey()  *rsa.PublicKey
 func (p *Provider) JWKS()       []byte
+func (p *Provider) KeyID()      string
 func (p *Provider) Issue(audience, subject, role string) (string, string, *time.Time, *time.Time, error)
 func (p *Provider) Parse(rawToken, audience string) (*CustomClaims, bool)
 ```
@@ -40,6 +41,7 @@ func (p *Provider) Parse(rawToken, audience string) (*CustomClaims, bool)
 | `PrivateKey()` | Returns the RSA private key (used for signing) |
 | `PublicKey()` | Returns the RSA public key (used for verification) |
 | `JWKS()` | Returns the pre-built JWKS document as JSON bytes |
+| `KeyID()` | Returns the ID of the key, written as `kid` into the header of every token and into the JWKS |
 | `Issue(...)` | Signs and returns a new token (see below) |
 | `Parse(...)` | Validates and parses a token (see below) |
 
@@ -59,7 +61,7 @@ signed, jti, issuedAt, expiresAt, err := p.Issue("myapp", "user:42", "admin")
 
 | Value | Type | Description |
 |---|---|---|
-| `signed` | `string` | The compact-serialised JWT string |
+| `signed` | `string` | The compact-serialised JWT string, with the `kid` of the provider's key in its header |
 | `jti` | `string` | Unique token ID (UUID v4) — store this to support revocation |
 | `issuedAt` | `*time.Time` | Timestamp the token was created |
 | `expiresAt` | `*time.Time` | Timestamp the token expires (1 hour after `issuedAt`) |
@@ -104,7 +106,9 @@ role    := claims.Role      // "admin"
 
 ## Validating tokens from a remote issuer
 
-When your service consumes tokens issued by a separate auth server, use `ValidateWithJWKS`. It fetches the JWKS document at the given URI, extracts the first RSA public key, and verifies the token — no local `Provider` needed.
+When your service consumes tokens issued by a separate auth server, use `ValidateWithJWKS`. It fetches the JWKS document at the given URI, chooses the key that signed the token, and verifies the token — no local `Provider` needed.
+
+The key is the one whose `kid` is the `kid` in the header of the token. This way, a JWKS can have several keys, e.g. while the issuer rotates them: tokens signed with the old key and tokens signed with the new key are both valid until the old key is removed from the JWKS. A token without a `kid` is accepted only when the JWKS has exactly one key, as there is no way to tell which key to use otherwise.
 
 ```go
 claims, err := pkgjwt.ValidateWithJWKS(
@@ -127,7 +131,7 @@ if err != nil {
 | `audience` | `string` | Expected `aud` claim value |
 | `bearerToken` | `string` | The raw JWT string from the request |
 
-Returns a descriptive error if the JWKS cannot be fetched or decoded, if no RSA key is found in the set, or if the token fails signature, expiry, issuer, or audience validation.
+Returns a descriptive error if the JWKS cannot be fetched or decoded, if it has no keys, if it has no key with the `kid` of the token, if that key is not an RSA key, or if the token has no `kid` and the JWKS has more than one key. A token that fails signature, expiry, issuer, or audience validation returns the error `invalid token`.
 
 ## JWKS endpoint
 
@@ -146,6 +150,10 @@ The document is generated once at startup by `NewProvider` and cached on the `Pr
 jwksBytes, err := pkgjwt.JWKS(publicKey)
 ```
 
+The `kid` of the key is its RFC 7638 thumbprint, a base64url-encoded SHA-256 hash of the public key, so the same key always gets the same `kid`. `pkgjwt.KeyID(publicKey)` returns it, e.g. to set the `kid` of tokens signed with the key by other code.
+
+`NewProvider` generates a new key every time it is called, so tokens issued before a restart cannot be verified after it.
+
 ## Complete example
 
 ```go
@@ -157,7 +165,7 @@ import (
     "net/http"
     "strings"
 
-    pkgjwt "github.com/mikolajgasior/gorestapi/pkg/jwt"
+    pkgjwt "github.com/mikogs/gorestapi/pkg/jwt"
 )
 
 const audience = "myapp"

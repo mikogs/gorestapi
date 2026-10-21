@@ -28,6 +28,7 @@ func (p *Provider) Issue(audience, subject, role string) (string, string, *time.
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = p.keyID
 
 	signed, err := token.SignedString(p.privateKey)
 	if err != nil {

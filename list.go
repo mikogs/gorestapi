@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	svccrud "github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route) {
@@ -96,6 +96,11 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 			Code: CodeServiceError,
 		})
 		return
+	}
+
+	// an empty list is encoded as [] rather than null
+	if objs == nil {
+		objs = []interface{}{}
 	}
 
 	pwFields := h.svc.PasswordFieldNames(key)

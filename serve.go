@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mikolajgasior/gocrud/pkg/logger"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
-	"github.com/mikolajgasior/gorestapi/pkg/urlpath"
+	"github.com/mikogs/gocrud/pkg/logger"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gorestapi/pkg/urlpath"
 )
 
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {

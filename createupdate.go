@@ -5,12 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/mikolajgasior/gocrud"
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonreq"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	svccrud "github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gorestapi/pkg/jsonreq"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
@@ -28,7 +27,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 			return
 		}
 
-		// Use the override constructor — skip reading the existing record.
+		// Load the existing record, with the override constructor when it is set.
 		// The URL id is authoritative; any id in the JSON body is overwritten below.
 		obj, _, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor, nil)
 		if err != nil {
@@ -72,6 +71,10 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		return
 	}
 
+	// The id in the URL is authoritative, so that an id in the request body cannot make an update or a create
+	// write to another record, e.g. one that the Allow hooks would not allow.
+	gocrud.ObjSetIDValue(obj, idInt)
+
 	if id == "" && route.AllowCreate != nil {
 		if err := route.AllowCreate(obj, r); err != nil {
 			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
@@ -80,12 +83,6 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 			})
 			return
 		}
-	}
-
-	// When an update constructor is used the URL id must win over any id in the
-	// JSON body, so set it after unmarshalling.
-	if id != "" && route.UpdateConstructor != nil {
-		gocrud.ObjSetIDValue(obj, idInt)
 	}
 
 	if id == "" && route.PreCreate != nil {
@@ -107,29 +104,40 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	now := time.Now().UTC().Unix()
 	userID := uint64(0)
 	if h.options.UserIDFunc != nil {
 		userID = h.options.UserIDFunc(r)
 	}
 
-	err = h.svc.Save(ctx, obj, now, userID)
+	err = h.svc.Save(ctx, obj, userID)
 	if err != nil {
 		var validErr *svccrud.ModelValidationError
-		if errors.As(err, &validErr) {
+		var uniqErr *gocrud.UniqError
+		switch {
+		case errors.As(err, &validErr):
 			message := err.Error()
 			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
 				Ok:      true,
 				Code:    jsonresp.CodeValidationFailed,
 				Message: &message,
+				Data:    validErr.Violations,
 			})
-			return
+		case errors.As(err, &uniqErr):
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeUniqueViolation,
+			})
+		case errors.Is(err, gocrud.ForeignKeyViolationError):
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeForeignKeyViolation,
+			})
+		default:
+			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
+				Ok:   true,
+				Code: CodeServiceError,
+			})
 		}
-
-		jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-			Ok:   true,
-			Code: CodeServiceError,
-		})
 		return
 	}
 	idInt = h.svc.ID(obj)

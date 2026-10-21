@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	svccrud "github.com/mikogs/gocrud/pkg/service"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
@@ -51,6 +52,15 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeNotFound,
+			})
+			return
+		}
+
+		// other objects reference the object with a foreign key that does not allow deleting it
+		if errors.Is(err, gocrud.ForeignKeyViolationError) {
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeForeignKeyViolation,
 			})
 			return
 		}
