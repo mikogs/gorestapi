@@ -1,0 +1,1066 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/mikogs/gorestapi/jwt/">
+      
+      
+        <link rel="prev" href="../handler/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>JWT - gorestapi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="amber" data-md-color-accent="orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#jwt" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="gorestapi" class="md-header__button md-logo" aria-label="gorestapi" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gorestapi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              JWT
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="gorestapi" class="md-nav__button md-logo" aria-label="gorestapi" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    gorestapi
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JWT
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JWT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#issuing-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issuing tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parsing-and-verifying-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parsing and verifying tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validating-tokens-from-a-remote-issuer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating tokens from a remote issuer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#jwks-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JWKS endpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key rotation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#initialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initialization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#issuing-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issuing tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parsing-and-verifying-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parsing and verifying tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validating-tokens-from-a-remote-issuer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validating tokens from a remote issuer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#jwks-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JWKS endpoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key rotation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="jwt">JWT</h1>
+<p>The <code>pkg/jwt</code> package provides RS256-based JSON Web Token issuance and verification, plus a JWKS endpoint helper. It wraps <a href="https://github.com/golang-jwt/jwt"><code>github.com/golang-jwt/jwt/v5</code></a> for token operations and <a href="https://github.com/go-jose/go-jose"><code>github.com/go-jose/go-jose/v3</code></a> for JWKS serialisation.</p>
+<h2 id="initialization">Initialization</h2>
+<p><code>NewProvider</code> signs tokens with an RSA key, which you load from a secret. All the instances of an application, and the application after a restart, must use the same key: tokens signed with one key are rejected by a provider with another key.</p>
+<p>Create the key once, e.g. with OpenSSL, and store it as a secret, e.g. in a secret manager, or in an environment variable of the deployment:</p>
+<pre><code class="language-bash">openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-signing-key.pem
+</code></pre>
+<pre><code class="language-go">import pkgjwt &quot;github.com/mikogs/gorestapi/pkg/jwt&quot;
+
+signingKey, err := pkgjwt.ParsePrivateKeyPEM([]byte(os.Getenv(&quot;JWT_SIGNING_KEY&quot;)))
+if err != nil {
+    log.Fatalf(&quot;JWT_SIGNING_KEY: %v&quot;, err)
+}
+
+p, err := pkgjwt.NewProvider(&quot;https://auth.example.com&quot;, signingKey)
+if err != nil {
+    log.Fatal(err)
+}
+</code></pre>
+<pre><code class="language-go">func NewProvider(issuer string, signingKey *rsa.PrivateKey, options ...Option) (*Provider, error)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>issuer</code></td>
+<td><code>string</code></td>
+<td>The <code>iss</code> claim written into every issued token and validated on parse</td>
+</tr>
+<tr>
+<td><code>signingKey</code></td>
+<td><code>*rsa.PrivateKey</code></td>
+<td>The key that signs the tokens, of at least 2048 bits (<code>pkgjwt.MinKeyBits</code>)</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>...Option</code></td>
+<td><code>WithTokenTTL</code> and <code>WithVerificationKeys</code>, see below</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithTokenTTL(ttl time.Duration)</code></td>
+<td>The time for which issued tokens are valid. Default: <code>pkgjwt.DefaultTokenTTL</code>, 1 hour</td>
+</tr>
+<tr>
+<td><code>WithVerificationKeys(keys ...*rsa.PublicKey)</code></td>
+<td>Keys that verify tokens, but do not sign them, e.g. the previous key after a <a href="#key-rotation">rotation</a></td>
+</tr>
+</tbody>
+</table>
+<p>The keys are loaded with:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Formats</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ParsePrivateKeyPEM(data []byte) (*rsa.PrivateKey, error)</code></td>
+<td>PKCS #8 (<code>BEGIN PRIVATE KEY</code>, from <code>openssl genpkey</code>) and PKCS #1 (<code>BEGIN RSA PRIVATE KEY</code>)</td>
+</tr>
+<tr>
+<td><code>ParsePublicKeyPEM(data []byte) (*rsa.PublicKey, error)</code></td>
+<td>PKIX (<code>BEGIN PUBLIC KEY</code>, from <code>openssl pkey -pubout</code>) and PKCS #1 (<code>BEGIN RSA PUBLIC KEY</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Keys that are not RSA keys, or have fewer than 2048 bits, are rejected. In tests, <code>pkgjwt.GenerateKey()</code> returns a new key. Do not use it in an application: with a new key on every start, users are logged out by every restart, and the instances of the application reject the tokens of each other.</p>
+<h3 id="provider">Provider</h3>
+<pre><code class="language-go">type Provider struct { /* unexported */ }
+
+func (p *Provider) Issuer()     string
+func (p *Provider) PrivateKey() *rsa.PrivateKey
+func (p *Provider) PublicKey()  *rsa.PublicKey
+func (p *Provider) JWKS()       []byte
+func (p *Provider) KeyID()      string
+func (p *Provider) TokenTTL()   time.Duration
+func (p *Provider) Issue(audience, subject, role string) (string, string, *time.Time, *time.Time, error)
+func (p *Provider) Parse(rawToken, audience string) (*CustomClaims, bool)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Issuer()</code></td>
+<td>Returns the issuer string passed to <code>NewProvider</code></td>
+</tr>
+<tr>
+<td><code>PrivateKey()</code></td>
+<td>Returns the signing key</td>
+</tr>
+<tr>
+<td><code>PublicKey()</code></td>
+<td>Returns the public key of the signing key</td>
+</tr>
+<tr>
+<td><code>JWKS()</code></td>
+<td>Returns the pre-built JWKS document, with the signing key and the verification keys, as JSON bytes</td>
+</tr>
+<tr>
+<td><code>KeyID()</code></td>
+<td>Returns the ID of the signing key, written as <code>kid</code> into the header of every token</td>
+</tr>
+<tr>
+<td><code>TokenTTL()</code></td>
+<td>Returns the time for which issued tokens are valid</td>
+</tr>
+<tr>
+<td><code>Issue(...)</code></td>
+<td>Signs and returns a new token (see below)</td>
+</tr>
+<tr>
+<td><code>Parse(...)</code></td>
+<td>Validates and parses a token (see below)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="issuing-tokens">Issuing tokens</h2>
+<pre><code class="language-go">signed, jti, issuedAt, expiresAt, err := p.Issue(&quot;myapp&quot;, &quot;user:42&quot;, &quot;admin&quot;)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>audience</code></td>
+<td><code>string</code></td>
+<td>Written as the <code>aud</code> claim; must match what <code>Parse</code> expects</td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td><code>string</code></td>
+<td>Written as the <code>sub</code> claim — typically a user ID or unique identifier</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td><code>string</code></td>
+<td>Written as the <code>role</code> claim in <code>CustomClaims</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>signed</code></td>
+<td><code>string</code></td>
+<td>The compact-serialised JWT string, with the <code>kid</code> of the provider's key in its header</td>
+</tr>
+<tr>
+<td><code>jti</code></td>
+<td><code>string</code></td>
+<td>Unique token ID (UUID v4) — store this to support revocation</td>
+</tr>
+<tr>
+<td><code>issuedAt</code></td>
+<td><code>*time.Time</code></td>
+<td>Timestamp the token was created</td>
+</tr>
+<tr>
+<td><code>expiresAt</code></td>
+<td><code>*time.Time</code></td>
+<td>Timestamp the token expires, <code>TokenTTL()</code> after <code>issuedAt</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="parsing-and-verifying-tokens">Parsing and verifying tokens</h2>
+<pre><code class="language-go">claims, ok := p.Parse(rawToken, &quot;myapp&quot;)
+if !ok {
+    // token is invalid, expired, or has wrong issuer/audience
+}
+
+subject := claims.Subject
+role    := claims.Role
+</code></pre>
+<p><code>Parse</code> validates the signature, expiry, issuer, and audience in one call. The signature is verified with the key of the <code>kid</code> in the header of the token: the signing key, or one of the verification keys. A token without a <code>kid</code>, or with the <code>kid</code> of another key, is rejected. It returns <code>(nil, false)</code> on any failure so callers never need to inspect a partial <code>claims</code> struct.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rawToken</code></td>
+<td><code>string</code></td>
+<td>Compact-serialised JWT from the request</td>
+</tr>
+<tr>
+<td><code>audience</code></td>
+<td><code>string</code></td>
+<td>Expected <code>aud</code> value</td>
+</tr>
+</tbody>
+</table>
+<p>A clock skew tolerance of 30 seconds is applied automatically.</p>
+<h2 id="claims">Claims</h2>
+<pre><code class="language-go">type CustomClaims struct {
+    Role string `json:&quot;role&quot;`
+    jwt.RegisteredClaims
+}
+</code></pre>
+<p><code>CustomClaims</code> embeds the standard <code>jwt.RegisteredClaims</code> (which carries <code>Subject</code>, <code>Issuer</code>, <code>Audience</code>, <code>ExpiresAt</code>, <code>IssuedAt</code>, <code>NotBefore</code>, <code>ID</code>) and adds a <code>Role</code> field. Access standard fields directly via the embedded struct:</p>
+<pre><code class="language-go">subject := claims.Subject   // whatever was passed to Issue
+expiry  := claims.ExpiresAt // *jwt.NumericDate
+role    := claims.Role      // &quot;admin&quot;
+</code></pre>
+<h2 id="validating-tokens-from-a-remote-issuer">Validating tokens from a remote issuer</h2>
+<p>When your service consumes tokens issued by a separate auth server, use <code>ValidateWithJWKS</code>. It fetches the JWKS document at the given URI, chooses the key that signed the token, and verifies the token — no local <code>Provider</code> needed.</p>
+<p>The key is the one whose <code>kid</code> is the <code>kid</code> in the header of the token. This way, a JWKS can have several keys, e.g. while the issuer rotates them: tokens signed with the old key and tokens signed with the new key are both valid until the old key is removed from the JWKS. A token without a <code>kid</code> is accepted only when the JWKS has exactly one key, as there is no way to tell which key to use otherwise.</p>
+<pre><code class="language-go">claims, err := pkgjwt.ValidateWithJWKS(
+    ctx,
+    &quot;https://auth.example.com/.well-known/jwks.json&quot;,
+    &quot;https://auth.example.com&quot;, // expected issuer
+    &quot;myapp&quot;,                    // expected audience
+    bearerToken,
+)
+if err != nil {
+    // fetch failed, key missing, or token invalid
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ctx</code></td>
+<td><code>context.Context</code></td>
+<td>Controls the HTTP request to the JWKS endpoint</td>
+</tr>
+<tr>
+<td><code>jwksURI</code></td>
+<td><code>string</code></td>
+<td>Full URL of the JWKS document</td>
+</tr>
+<tr>
+<td><code>issuer</code></td>
+<td><code>string</code></td>
+<td>Expected <code>iss</code> claim value</td>
+</tr>
+<tr>
+<td><code>audience</code></td>
+<td><code>string</code></td>
+<td>Expected <code>aud</code> claim value</td>
+</tr>
+<tr>
+<td><code>bearerToken</code></td>
+<td><code>string</code></td>
+<td>The raw JWT string from the request</td>
+</tr>
+</tbody>
+</table>
+<p>Returns a descriptive error if the JWKS cannot be fetched or decoded, if it has no keys, if it has no key with the <code>kid</code> of the token, if that key is not an RSA key, or if the token has no <code>kid</code> and the JWKS has more than one key. A token that fails signature, expiry, issuer, or audience validation returns the error <code>invalid token</code>.</p>
+<h2 id="jwks-endpoint">JWKS endpoint</h2>
+<p>Expose the public key to external verifiers (e.g. an API gateway or a frontend using a JWKS library):</p>
+<pre><code class="language-go">http.HandleFunc(&quot;/.well-known/jwks.json&quot;, func(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    w.Write(p.JWKS())
+})
+</code></pre>
+<p>The document is generated once by <code>NewProvider</code> and cached on the <code>Provider</code>. It has the signing key first, followed by the verification keys. To generate a JWKS from existing public keys directly:</p>
+<pre><code class="language-go">jwksBytes, err := pkgjwt.JWKS(publicKey, previousPublicKey)
+</code></pre>
+<p>The <code>kid</code> of the key is its RFC 7638 thumbprint, a base64url-encoded SHA-256 hash of the public key, so the same key always gets the same <code>kid</code>. <code>pkgjwt.KeyID(publicKey)</code> returns it, e.g. to set the <code>kid</code> of tokens signed with the key by other code.</p>
+<h2 id="key-rotation">Key rotation</h2>
+<p>Replace the signing key from time to time, or at once when it may have leaked. Tokens signed with the old key stay valid until they expire, when the old key is a verification key of the new provider:</p>
+<ol>
+<li>Create a new key, and keep the public key of the old one:
+   <code>bash
+   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-signing-key-2.pem
+   openssl pkey -in jwt-signing-key.pem -pubout -out jwt-previous-public-key.pem</code></li>
+<li>Deploy the application with the new key as <code>JWT_SIGNING_KEY</code>, and the old public key as <code>JWT_PREVIOUS_PUBLIC_KEY</code>:
+   ```go
+   var options []pkgjwt.Option
+   if previous := os.Getenv("JWT_PREVIOUS_PUBLIC_KEY"); previous != "" {
+       previousKey, err := pkgjwt.ParsePublicKeyPEM([]byte(previous))
+       if err != nil {
+           log.Fatalf("JWT_PREVIOUS_PUBLIC_KEY: %v", err)
+       }
+       options = append(options, pkgjwt.WithVerificationKeys(previousKey))
+   }</li>
+</ol>
+<p>p, err := pkgjwt.NewProvider("https://auth.example.com", signingKey, options...)
+   <code>``
+   New tokens are signed with the new key. Tokens of both keys are accepted by</code>Parse<code>, and by</code>ValidateWithJWKS<code>of other services, as the JWKS has both keys.
+3. After the longest lifetime of a token,</code>TokenTTL()<code>, remove</code>JWT_PREVIOUS_PUBLIC_KEY`. The tokens of the old key have expired by then.</p>
+<p>When the old key leaked, skip the waiting: deploy the new key without <code>JWT_PREVIOUS_PUBLIC_KEY</code>, which logs out all the users, but also rejects the tokens that someone else signed with the old key.</p>
+<h2 id="complete-example">Complete example</h2>
+<pre><code class="language-go">package main
+
+import (
+    &quot;fmt&quot;
+    &quot;log&quot;
+    &quot;net/http&quot;
+    &quot;os&quot;
+    &quot;strings&quot;
+    &quot;time&quot;
+
+    pkgjwt &quot;github.com/mikogs/gorestapi/pkg/jwt&quot;
+)
+
+const audience = &quot;myapp&quot;
+
+func main() {
+    signingKey, err := pkgjwt.ParsePrivateKeyPEM([]byte(os.Getenv(&quot;JWT_SIGNING_KEY&quot;)))
+    if err != nil {
+        log.Fatalf(&quot;JWT_SIGNING_KEY: %v&quot;, err)
+    }
+
+    p, err := pkgjwt.NewProvider(&quot;https://auth.example.com&quot;, signingKey, pkgjwt.WithTokenTTL(15*time.Minute))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Issue a token for user 42.
+    token, _, _, _, err := p.Issue(audience, &quot;42&quot;, &quot;member&quot;)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(&quot;token:&quot;, token)
+
+    mux := http.NewServeMux()
+
+    mux.HandleFunc(&quot;/.well-known/jwks.json&quot;, func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(&quot;Content-Type&quot;, &quot;application/json&quot;)
+        w.Write(p.JWKS())
+    })
+
+    mux.HandleFunc(&quot;/protected&quot;, func(w http.ResponseWriter, r *http.Request) {
+        raw := strings.TrimPrefix(r.Header.Get(&quot;Authorization&quot;), &quot;Bearer &quot;)
+        claims, ok := p.Parse(raw, audience)
+        if !ok {
+            http.Error(w, &quot;unauthorized&quot;, http.StatusUnauthorized)
+            return
+        }
+        fmt.Fprintf(w, &quot;hello %s (role: %s)&quot;, claims.Subject, claims.Role)
+    })
+
+    http.ListenAndServe(&quot;:8080&quot;, mux)
+}
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026 Mikołaj Gąsior
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/mikogs/gorestapi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M360.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6m64.6 136.1c-12.5 12.5-12.5 32.8 0 45.3l73.4 73.4-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l96-96c12.5-12.5 12.5-32.8 0-45.3l-96-96c-12.5-12.5-32.8-12.5-45.3 0zm-274.7 0c-12.5-12.5-32.8-12.5-45.3 0l-96 96c-12.5 12.5-12.5 32.8 0 45.3l96 96c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l73.3-73.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
