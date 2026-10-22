@@ -92,7 +92,7 @@ Routes: map[string]gorestapi.Route{
 
 **AllowedFilters**
 
-`AllowedFilters` is a whitelist of field names that clients may pass as filters. When empty all fields are allowed (unless `DisableFilters` is set). Fields not in the list are silently dropped from the request.
+`AllowedFilters` is a whitelist of field names that clients may pass as filters. When empty all fields are allowed (unless `DisableFilters` is set). Fields not in the list are silently dropped from the request, also in [filter groups](#list-get-path), e.g. `filter_val_Status.q` is allowed when `Status` is.
 
 ```go
 Routes: map[string]gorestapi.Route{
@@ -133,9 +133,9 @@ Routes: map[string]gorestapi.Route{
 
 **Server-side filters — FilterList / FilterRead**
 
-These hooks inject server-controlled filters into queries, merging with (and taking precedence over) any client-supplied filters so clients cannot override them.
+These hooks add server-controlled filters to queries, e.g. that a record belongs to the signed-in user. They are joined with AND around all the filters of the client, so the client cannot get other records: a client filter on the same field only narrows the result, e.g. to nothing, and a [filter group](#list-get-path) joined with OR stays inside them.
 
-`FilterList` is applied to every list request (`GET /{path}/`). `FilterRead` is applied when reading a single record by ID (`GET /{path}/{id}`); when set, the handler uses `List(limit=1)` with the ID added as an extra constraint so mismatches return `404` rather than revealing record existence.
+`FilterList` is applied to every list request (`GET /{path}/`), also with `DisableFilters`. `FilterRead` is applied when reading a single record by ID (`GET /{path}/{id}`); when set, the handler uses `List(limit=1)` with these filters and the ID, so mismatches return `404` rather than revealing record existence.
 
 ```go
 type FilterSet struct {
@@ -284,7 +284,17 @@ Returns a paginated, filtered list of records.
 
 Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`. Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud service](https://mikogs.github.io/gocrud/pkgs/service/) for the details.
 
-An invalid filter value is a `400 VALIDATION_FAILED` response, with the failed rules in `data`.
+**Filter groups.** The filters are joined with AND. To join filters with OR, put them in a group, by adding the same name of letters, digits or underscores after the field name and a dot, e.g. `q` in `filter_val_Title.q` and `filter_op_Title.q`. The filters of a group are joined with OR, and the group with AND with the other filters and groups.
+
+| Query | Lists the records |
+|---|---|
+| `filter_val_Title.q=%25go%25&filter_op_Title.q=like&filter_val_Body.q=%25go%25&filter_op_Body.q=like` | with `go` in the title or the body |
+| `filter_val_Status=paid&filter_val_Total.a=100&filter_op_Total.a=gt&filter_val_Express.a=true` | that are paid, and either cost more than 100 or are express |
+| `filter_val_Total.min=100&filter_op_Total.min=ge&filter_val_Total.max=500&filter_op_Total.max=lt` | that cost from 100 to 500, as a group with one filter is joined with AND |
+
+`%25` is the URL encoding of `%`, the wildcard of `like`.
+
+An invalid filter is a `400 VALIDATION_FAILED` response, with the failed rules in `data`, e.g. `{"Status": "oneof"}`.
 
 **Response `200 OK`:**
 ```json

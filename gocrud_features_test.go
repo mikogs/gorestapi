@@ -201,9 +201,12 @@ func TestServe_ListFilters(t *testing.T) {
 		}
 	}
 
-	code, resp := serveJSON(t, h, http.MethodGet, "/orders/?filter_val_Status=new,lost&filter_op_Status=in", 0, nil)
+	code, resp := serveJSON(t, h, http.MethodGet, "/orders/?filter_val_Status.q=new,lost&filter_op_Status.q=in", 0, nil)
 	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed {
 		t.Fatalf("a list with an invalid value returned %d %+v, want %d %s", code, resp, http.StatusBadRequest, jsonresp.CodeValidationFailed)
+	}
+	if !reflect.DeepEqual(resp.Data, map[string]interface{}{"Status": "oneof"}) {
+		t.Fatalf("a list with an invalid value returned data %v, want the violations {Status: oneof}", resp.Data)
 	}
 }
 

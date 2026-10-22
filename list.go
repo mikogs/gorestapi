@@ -77,6 +77,7 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 				Ok:      true,
 				Code:    jsonresp.CodeValidationFailed,
 				Message: &message,
+				Data:    validErr.Violations,
 			})
 			return
 		}

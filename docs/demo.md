@@ -118,7 +118,7 @@ handler := gorestapi.New(svc, gorestapi.Options{
 })
 ```
 
-`FilterList` and `FilterRead` automatically scope every notes query to the caller's user ID, so a user can only list and read their own notes. Injected filters take precedence over any client-supplied `filter_val_*` parameters.
+`FilterList` and `FilterRead` automatically scope every notes query to the caller's user ID, so a user can only list and read their own notes. They are joined with AND around any client-supplied `filter_val_*` parameters, so a client cannot widen them.
 
 ## Mounting
 
