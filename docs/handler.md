@@ -26,7 +26,7 @@ handler := gorestapi.New(svc, gorestapi.Options{})
 type Options struct {
     CORS       cors.CORS
     Routes     map[string]Route
-    UserIDFunc func(r *http.Request) uint64
+    UserIDFunc func(r *http.Request) interface{}
 }
 ```
 
@@ -34,7 +34,7 @@ type Options struct {
 |---|---|---|
 | `CORS` | `cors.CORS` | CORS headers written on every response. Zero value emits no CORS headers. |
 | `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Only the paths in the map are served, other paths return `404`. A route with the zero value has all operations enabled and all filters allowed, e.g. `"notes": {}`. |
-| `UserIDFunc` | `func(*http.Request) uint64` | Called on every create and update request to obtain the current user's ID, passed to the service as `ModifiedBy`. When `nil`, `ModifiedBy` is always `0`. When the struct has the `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` fields, gocrud sets them from this ID and the time of the request, ignores the values sent in the request body, and never changes `CreatedAt` and `CreatedBy` on an update. |
+| `UserIDFunc` | `func(*http.Request) interface{}` | Called on every create and update request to obtain the current user's ID, passed to the service as `ModifiedBy`: a `uint64`, or a `string` for `CreatedBy` and `ModifiedBy` fields of type `string`, e.g. the subject of a JWT. When `nil`, or when it returns `nil`, `ModifiedBy` is `0` or `""`. When the struct has the `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` fields, gocrud sets them from this ID and the time of the request, ignores the values sent in the request body, and never changes `CreatedAt` and `CreatedBy` on an update. |
 
 ### Route
 
@@ -242,7 +242,7 @@ mux.Handle("/api/", http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
 http.ListenAndServe(":8080", mux)
 ```
 
-After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional numeric record ID.
+After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional record ID: a number, or a UUID for structs with a `string` ID, see [The ID Field](https://mikogs.github.io/gocrud/struct/#1-the-id-field).
 
 ## URL scheme
 
@@ -251,7 +251,9 @@ After stripping the mount prefix the handler expects URLs of the form `/{path}/{
 /{path}/{id}       — read / update / delete
 ```
 
-`path` must match a key in `Options.Routes`. `id` must be a number or absent, otherwise the response is `400 URL_PATH_ID`.
+`path` must match a key in `Options.Routes`. `id` must be a single path segment of letters, digits, `-` and `_`, or absent, otherwise the response is `400 URL_PATH_ID`.
+
+An `id` that is not valid for the records of the route, e.g. `abc` for a numeric ID, or `42` for a UUID, is answered like an `id` that does not exist, with `404 NOT_FOUND`, so that the response does not tell which IDs could exist. A UUID can be written in any letter case.
 
 ## Password fields
 
@@ -331,7 +333,7 @@ Returns a single record by ID.
 
 ### Create — `PUT /{path}/`
 
-Creates a new record. The request body must be a JSON object whose keys match the struct's field names (or `json` tags when set). An `ID` in the body is ignored, so a create cannot overwrite an existing record.
+Creates a new record. The request body must be a JSON object whose keys match the struct's field names (or `json` tags when set). An `ID` in the body is ignored, so a create cannot overwrite an existing record. The ID is assigned by the database, or a UUID is generated for a struct with a `string` ID, and returned in `data.id`.
 
 **Request body:**
 ```json
@@ -346,6 +348,8 @@ Creates a new record. The request body must be a JSON object whose keys match th
   "data": { "id": 42 }
 }
 ```
+
+For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d"`.
 
 **Response `400 Bad Request`** (validation failure). `data` maps the fields that failed to the names of the failed [validation rules](https://mikogs.github.io/gocrud/struct/#validation-errors):
 ```json
@@ -421,7 +425,7 @@ Every response is a JSON object with the following shape:
 | `UNIQUE_VIOLATION` | 409 | A unique field already has the value |
 | `FOREIGN_KEY_VIOLATION` | 409 | The record references a record that does not exist, or is referenced by other records |
 | `BAD_REQUEST` | 400 | Malformed URL, unparseable request body, or a method that is not supported for the URL, e.g. `PATCH`, or `DELETE` without an id |
-| `URL_PATH_ID` | 400 | ID segment in the URL is not a valid number |
+| `URL_PATH_ID` | 400 | The part of the URL after the route is not a single segment of letters, digits, `-` and `_` |
 | `NOT_ALLOWED` | 405 | Operation is disabled for this route via `Flags` |
 | `FORBIDDEN` | 403 | An `Allow*` hook rejected the request |
 | `SERVICE_ERROR` | 500 | Internal error from the service or a `Pre*` / `Post*` hook |

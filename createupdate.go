@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/mikogs/gocrud"
 	svccrud "github.com/mikogs/gocrud/pkg/service"
@@ -13,25 +12,15 @@ import (
 )
 
 func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	var idInt uint64
 	var err error
 	var obj interface{}
 
 	if id != "" {
-		idInt, err = strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeBadRequest,
-			})
-			return
-		}
-
 		// Load the existing record, with the override constructor when it is set.
 		// The URL id is authoritative; any id in the JSON body is overwritten below.
-		obj, _, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor, nil)
+		obj, _, err = h.svc.Read(ctx, key, id, route.UpdateConstructor, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.ErrNotFound) {
+			if isNotFound(err) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
@@ -72,8 +61,19 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 	}
 
 	// The id in the URL is authoritative, so that an id in the request body cannot make an update or a create
-	// write to another record, e.g. one that the Allow hooks would not allow.
-	gocrud.ObjSetIDValue(obj, idInt)
+	// write to another record, e.g. one that the Allow hooks would not allow. A create clears the id, and the
+	// record gets a new one. The id was read above, so it is valid.
+	var urlID interface{}
+	if id != "" {
+		urlID = id
+	}
+	if err := gocrud.ObjSetIDValue(obj, urlID); err != nil {
+		jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
+			Ok:   true,
+			Code: CodeServiceError,
+		})
+		return
+	}
 
 	if id == "" && route.AllowCreate != nil {
 		if err := route.AllowCreate(obj, r); err != nil {
@@ -104,7 +104,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	userID := uint64(0)
+	var userID interface{}
 	if h.options.UserIDFunc != nil {
 		userID = h.options.UserIDFunc(r)
 	}

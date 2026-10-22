@@ -4,27 +4,16 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/mikogs/gocrud"
-	svccrud "github.com/mikogs/gocrud/pkg/service"
 	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeBadRequest,
-		})
-		return
-	}
-
 	if route.AllowDelete != nil {
-		obj, _, err := h.svc.Read(ctx, key, idInt, nil, nil)
+		obj, _, err := h.svc.Read(ctx, key, id, nil, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.ErrNotFound) {
+			if isNotFound(err) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
@@ -46,9 +35,9 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 		}
 	}
 
-	err = h.svc.Delete(ctx, key, idInt)
+	err := h.svc.Delete(ctx, key, id)
 	if err != nil {
-		if errors.Is(err, svccrud.ErrNotFound) {
+		if isNotFound(err) {
 			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeNotFound,

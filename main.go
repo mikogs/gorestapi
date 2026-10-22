@@ -96,9 +96,10 @@ type Options struct {
 	CORS   cors.CORS
 	Routes map[string]Route
 	// UserIDFunc is called on every create and update request to obtain the
-	// current user's ID, which is passed to the service as ModifiedBy.
-	// When nil, ModifiedBy is always 0.
-	UserIDFunc func(r *http.Request) uint64
+	// current user's ID, which is passed to the service as ModifiedBy: a
+	// uint64, or a string for CreatedBy and ModifiedBy fields of type string.
+	// When nil, or when it returns nil, ModifiedBy is the zero value.
+	UserIDFunc func(r *http.Request) interface{}
 }
 
 type Handler struct {

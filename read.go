@@ -4,22 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
 	svccrud "github.com/mikogs/gocrud/pkg/service"
 	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeBadRequest,
-		})
-		return
-	}
-
 	var obj interface{}
 
 	if route.FilterRead != nil {
@@ -31,6 +21,10 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 		}
 
 		objs, _, listErr := h.svc.List(ctx, key, 1, 0, "", "", filters, nil, route.ReadConstructor, nil)
+		var validErr *svccrud.FilterValidationError
+		if errors.As(listErr, &validErr) && validErr.Violations["ID"] != "" {
+			objs, listErr = nil, nil
+		}
 		if listErr != nil {
 			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
 				Ok:   true,
@@ -47,9 +41,10 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 		}
 		obj = objs[0]
 	} else {
-		obj, _, err = h.svc.Read(ctx, key, idInt, route.ReadConstructor, nil)
+		var err error
+		obj, _, err = h.svc.Read(ctx, key, id, route.ReadConstructor, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.ErrNotFound) {
+			if isNotFound(err) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,

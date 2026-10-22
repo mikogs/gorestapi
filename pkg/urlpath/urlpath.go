@@ -5,23 +5,18 @@ import (
 	"strings"
 )
 
-var (
-	regexpNumeric = regexp.MustCompile(`^[0-9]+$`)
-)
+var regexpID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
+// ID returns the ID in the part of a URL path after the route, e.g. "123" or a UUID, and an empty string when there
+// is no ID. It returns false for a path that is not a single segment of letters, digits, '-' and '_'. Whether the ID
+// is valid for the record is checked when the record is read.
 func ID(path string) (string, bool) {
-	// path can start and end with /
 	path = strings.TrimRight(path, "/")
 	if path == "" {
 		return "", true
 	}
 
-	// take the last part of the path
-	pathParts := strings.Split(path, "/")
-	path = pathParts[len(pathParts)-1]
-
-	isNumeric := regexpNumeric.MatchString(path)
-	if !isNumeric {
+	if !regexpID.MatchString(path) {
 		return "", false
 	}
 

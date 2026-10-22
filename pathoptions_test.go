@@ -3,7 +3,6 @@ package gorestapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -112,7 +111,7 @@ func TestServe_DisableFilters(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableFilters})
 
 	// Request with a filter that would normally narrow to 3 rows — should be ignored.
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
@@ -143,7 +142,7 @@ func TestServe_AllowedFilters_AllowedFieldIsApplied(t *testing.T) {
 
 	h := handlerWith(Route{AllowedFilters: []string{"PrimaryEmail"}})
 
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
@@ -175,7 +174,7 @@ func TestServe_AllowedFilters_DisallowedFieldIsIgnored(t *testing.T) {
 	// Only "Age" is allowed — PrimaryEmail filter should be dropped.
 	h := handlerWith(Route{AllowedFilters: []string{"Age"}})
 
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)

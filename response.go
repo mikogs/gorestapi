@@ -2,9 +2,19 @@ package gorestapi
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
+
+	svccrud "github.com/mikogs/gocrud/pkg/service"
 )
+
+// isNotFound checks if err is returned for a record that does not exist, or for an ID that is not valid for the
+// records of the route, e.g. text for a numeric ID. Both are answered with 404, so that the response does not tell
+// which IDs could exist.
+func isNotFound(err error) bool {
+	return errors.Is(err, svccrud.ErrNotFound) || errors.Is(err, svccrud.ErrInvalidID)
+}
 
 // responseData returns a JSON-safe representation of obj with password fields
 // removed. If passwordFields is empty obj is returned as-is. Otherwise the

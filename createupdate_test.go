@@ -65,13 +65,17 @@ func TestServe_CreateUpdate(t *testing.T) {
 		t.Fatalf("CreateUpdate failed to insert struct to the table")
 	}
 
-	// Update
-	objJSON = test.TestStructJSON()
-
-	req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", idInt), bytes.NewReader(objJSON))
+	objSaved.FirstName = "Updated"
+	updateJSON, _ := json.Marshal(objSaved)
+	req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", idInt), bytes.NewReader(updateJSON))
 	w = httptest.NewRecorder()
 
+	testHandler.Serve(w, req)
+
 	if w.Code != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+		t.Fatalf("an update returned %d %s, want %d", w.Code, w.Body.String(), http.StatusOK)
+	}
+	if objLoaded := test.FatalIfNoTestStructInTheDatabase(t, testDB); objLoaded.ID != idInt || objLoaded.FirstName != "Updated" {
+		t.Fatalf("an update stored %+v, want the first name of object %d updated", objLoaded, idInt)
 	}
 }

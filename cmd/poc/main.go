@@ -29,8 +29,9 @@ type User struct {
 	ModifiedBy uint64
 }
 
+// Note has a UUID, so that the URLs of notes do not reveal how many there are.
 type Note struct {
-	ID         uint64
+	ID         string
 	Title      string `validate:"required,max=200"`
 	Content    string
 	Comment    string
@@ -72,7 +73,7 @@ func main() {
 	}
 
 	// X-User-ID is intentionally simple — a real app would use JWT or sessions.
-	userIDFromRequest := func(r *http.Request) uint64 {
+	userIDFromRequest := func(r *http.Request) interface{} {
 		id, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
 		return id
 	}

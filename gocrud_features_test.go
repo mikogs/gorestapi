@@ -50,7 +50,7 @@ func apiHandler(t *testing.T) *Handler {
 
 	return New(svc, Options{
 		Routes: map[string]Route{"customers": {}, "orders": {}},
-		UserIDFunc: func(r *http.Request) uint64 {
+		UserIDFunc: func(r *http.Request) interface{} {
 			id, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
 			return id
 		},
