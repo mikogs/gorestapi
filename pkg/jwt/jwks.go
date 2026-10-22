@@ -22,23 +22,26 @@ func KeyID(publicKey *rsa.PublicKey) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(thumbprint), nil
 }
 
-// JWKS returns a JWKS document with publicKey, whose "kid" is KeyID(publicKey).
-func JWKS(publicKey *rsa.PublicKey) ([]byte, error) {
-	keyID, err := KeyID(publicKey)
-	if err != nil {
-		return []byte{}, err
-	}
+// JWKS returns a JWKS document with the public keys, in their order, each with KeyID(key) as its "kid".
+func JWKS(publicKeys ...*rsa.PublicKey) ([]byte, error) {
+	jsonWebKeys := make([]jose.JSONWebKey, 0, len(publicKeys))
+	for _, publicKey := range publicKeys {
+		keyID, err := KeyID(publicKey)
+		if err != nil {
+			return []byte{}, err
+		}
 
-	jsonWebKey := jose.JSONWebKey{
-		Key:       publicKey,
-		Algorithm: string(jose.RS256),
-		Use:       "sig",
-		KeyID:     keyID,
+		jsonWebKeys = append(jsonWebKeys, jose.JSONWebKey{
+			Key:       publicKey,
+			Algorithm: string(jose.RS256),
+			Use:       "sig",
+			KeyID:     keyID,
+		})
 	}
 
 	container := struct {
 		Keys []jose.JSONWebKey `json:"keys"`
-	}{Keys: []jose.JSONWebKey{jsonWebKey}}
+	}{Keys: jsonWebKeys}
 
 	pretty, err := json.MarshalIndent(container, "", "  ")
 	if err != nil {

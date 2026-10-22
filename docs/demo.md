@@ -50,7 +50,7 @@ svc := svccrud.New(map[string]func() interface{}{
 svc.Migrate(context.Background())
 ```
 
-`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The service registry maps URL path segments to their constructors.
+`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The service registry maps URL path segments to their constructors. In production, keep the changes of the tables in migration files instead, see [Versioned migrations](https://mikogs.github.io/gocrud/crud/versioned-migrations/).
 
 ## Hooks
 

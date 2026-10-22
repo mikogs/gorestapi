@@ -4,22 +4,51 @@ The `pkg/jwt` package provides RS256-based JSON Web Token issuance and verificat
 
 ## Initialization
 
-`NewProvider` generates a fresh 2048-bit RSA key pair and pre-builds the JWKS document:
+`NewProvider` signs tokens with an RSA key, which you load from a secret. All the instances of an application, and the application after a restart, must use the same key: tokens signed with one key are rejected by a provider with another key.
+
+Create the key once, e.g. with OpenSSL, and store it as a secret, e.g. in a secret manager, or in an environment variable of the deployment:
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-signing-key.pem
+```
 
 ```go
 import pkgjwt "github.com/mikogs/gorestapi/pkg/jwt"
 
-p, err := pkgjwt.NewProvider("https://auth.example.com")
+signingKey, err := pkgjwt.ParsePrivateKeyPEM([]byte(os.Getenv("JWT_SIGNING_KEY")))
+if err != nil {
+    log.Fatalf("JWT_SIGNING_KEY: %v", err)
+}
+
+p, err := pkgjwt.NewProvider("https://auth.example.com", signingKey)
 if err != nil {
     log.Fatal(err)
 }
 ```
 
-`NewProvider` takes one argument:
+```go
+func NewProvider(issuer string, signingKey *rsa.PrivateKey, options ...Option) (*Provider, error)
+```
 
 | Argument | Type | Description |
 |---|---|---|
 | `issuer` | `string` | The `iss` claim written into every issued token and validated on parse |
+| `signingKey` | `*rsa.PrivateKey` | The key that signs the tokens, of at least 2048 bits (`pkgjwt.MinKeyBits`) |
+| `options` | `...Option` | `WithTokenTTL` and `WithVerificationKeys`, see below |
+
+| Option | Description |
+|---|---|
+| `WithTokenTTL(ttl time.Duration)` | The time for which issued tokens are valid. Default: `pkgjwt.DefaultTokenTTL`, 1 hour |
+| `WithVerificationKeys(keys ...*rsa.PublicKey)` | Keys that verify tokens, but do not sign them, e.g. the previous key after a [rotation](#key-rotation) |
+
+The keys are loaded with:
+
+| Function | Formats |
+|---|---|
+| `ParsePrivateKeyPEM(data []byte) (*rsa.PrivateKey, error)` | PKCS #8 (`BEGIN PRIVATE KEY`, from `openssl genpkey`) and PKCS #1 (`BEGIN RSA PRIVATE KEY`) |
+| `ParsePublicKeyPEM(data []byte) (*rsa.PublicKey, error)` | PKIX (`BEGIN PUBLIC KEY`, from `openssl pkey -pubout`) and PKCS #1 (`BEGIN RSA PUBLIC KEY`) |
+
+Keys that are not RSA keys, or have fewer than 2048 bits, are rejected. In tests, `pkgjwt.GenerateKey()` returns a new key. Do not use it in an application: with a new key on every start, users are logged out by every restart, and the instances of the application reject the tokens of each other.
 
 ### Provider
 
@@ -31,6 +60,7 @@ func (p *Provider) PrivateKey() *rsa.PrivateKey
 func (p *Provider) PublicKey()  *rsa.PublicKey
 func (p *Provider) JWKS()       []byte
 func (p *Provider) KeyID()      string
+func (p *Provider) TokenTTL()   time.Duration
 func (p *Provider) Issue(audience, subject, role string) (string, string, *time.Time, *time.Time, error)
 func (p *Provider) Parse(rawToken, audience string) (*CustomClaims, bool)
 ```
@@ -38,10 +68,11 @@ func (p *Provider) Parse(rawToken, audience string) (*CustomClaims, bool)
 | Method | Description |
 |---|---|
 | `Issuer()` | Returns the issuer string passed to `NewProvider` |
-| `PrivateKey()` | Returns the RSA private key (used for signing) |
-| `PublicKey()` | Returns the RSA public key (used for verification) |
-| `JWKS()` | Returns the pre-built JWKS document as JSON bytes |
-| `KeyID()` | Returns the ID of the key, written as `kid` into the header of every token and into the JWKS |
+| `PrivateKey()` | Returns the signing key |
+| `PublicKey()` | Returns the public key of the signing key |
+| `JWKS()` | Returns the pre-built JWKS document, with the signing key and the verification keys, as JSON bytes |
+| `KeyID()` | Returns the ID of the signing key, written as `kid` into the header of every token |
+| `TokenTTL()` | Returns the time for which issued tokens are valid |
 | `Issue(...)` | Signs and returns a new token (see below) |
 | `Parse(...)` | Validates and parses a token (see below) |
 
@@ -64,7 +95,7 @@ signed, jti, issuedAt, expiresAt, err := p.Issue("myapp", "user:42", "admin")
 | `signed` | `string` | The compact-serialised JWT string, with the `kid` of the provider's key in its header |
 | `jti` | `string` | Unique token ID (UUID v4) — store this to support revocation |
 | `issuedAt` | `*time.Time` | Timestamp the token was created |
-| `expiresAt` | `*time.Time` | Timestamp the token expires (1 hour after `issuedAt`) |
+| `expiresAt` | `*time.Time` | Timestamp the token expires, `TokenTTL()` after `issuedAt` |
 
 ## Parsing and verifying tokens
 
@@ -78,7 +109,7 @@ subject := claims.Subject
 role    := claims.Role
 ```
 
-`Parse` validates the signature, expiry, issuer, and audience in one call. It returns `(nil, false)` on any failure so callers never need to inspect a partial `claims` struct.
+`Parse` validates the signature, expiry, issuer, and audience in one call. The signature is verified with the key of the `kid` in the header of the token: the signing key, or one of the verification keys. A token without a `kid`, or with the `kid` of another key, is rejected. It returns `(nil, false)` on any failure so callers never need to inspect a partial `claims` struct.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -144,15 +175,40 @@ http.HandleFunc("/.well-known/jwks.json", func(w http.ResponseWriter, r *http.Re
 })
 ```
 
-The document is generated once at startup by `NewProvider` and cached on the `Provider`. To generate a JWKS from an existing public key directly:
+The document is generated once by `NewProvider` and cached on the `Provider`. It has the signing key first, followed by the verification keys. To generate a JWKS from existing public keys directly:
 
 ```go
-jwksBytes, err := pkgjwt.JWKS(publicKey)
+jwksBytes, err := pkgjwt.JWKS(publicKey, previousPublicKey)
 ```
 
 The `kid` of the key is its RFC 7638 thumbprint, a base64url-encoded SHA-256 hash of the public key, so the same key always gets the same `kid`. `pkgjwt.KeyID(publicKey)` returns it, e.g. to set the `kid` of tokens signed with the key by other code.
 
-`NewProvider` generates a new key every time it is called, so tokens issued before a restart cannot be verified after it.
+## Key rotation
+
+Replace the signing key from time to time, or at once when it may have leaked. Tokens signed with the old key stay valid until they expire, when the old key is a verification key of the new provider:
+
+1. Create a new key, and keep the public key of the old one:
+   ```bash
+   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-signing-key-2.pem
+   openssl pkey -in jwt-signing-key.pem -pubout -out jwt-previous-public-key.pem
+   ```
+2. Deploy the application with the new key as `JWT_SIGNING_KEY`, and the old public key as `JWT_PREVIOUS_PUBLIC_KEY`:
+   ```go
+   var options []pkgjwt.Option
+   if previous := os.Getenv("JWT_PREVIOUS_PUBLIC_KEY"); previous != "" {
+       previousKey, err := pkgjwt.ParsePublicKeyPEM([]byte(previous))
+       if err != nil {
+           log.Fatalf("JWT_PREVIOUS_PUBLIC_KEY: %v", err)
+       }
+       options = append(options, pkgjwt.WithVerificationKeys(previousKey))
+   }
+
+   p, err := pkgjwt.NewProvider("https://auth.example.com", signingKey, options...)
+   ```
+   New tokens are signed with the new key. Tokens of both keys are accepted by `Parse`, and by `ValidateWithJWKS` of other services, as the JWKS has both keys.
+3. After the longest lifetime of a token, `TokenTTL()`, remove `JWT_PREVIOUS_PUBLIC_KEY`. The tokens of the old key have expired by then.
+
+When the old key leaked, skip the waiting: deploy the new key without `JWT_PREVIOUS_PUBLIC_KEY`, which logs out all the users, but also rejects the tokens that someone else signed with the old key.
 
 ## Complete example
 
@@ -163,7 +219,9 @@ import (
     "fmt"
     "log"
     "net/http"
+    "os"
     "strings"
+    "time"
 
     pkgjwt "github.com/mikogs/gorestapi/pkg/jwt"
 )
@@ -171,7 +229,12 @@ import (
 const audience = "myapp"
 
 func main() {
-    p, err := pkgjwt.NewProvider("https://auth.example.com")
+    signingKey, err := pkgjwt.ParsePrivateKeyPEM([]byte(os.Getenv("JWT_SIGNING_KEY")))
+    if err != nil {
+        log.Fatalf("JWT_SIGNING_KEY: %v", err)
+    }
+
+    p, err := pkgjwt.NewProvider("https://auth.example.com", signingKey, pkgjwt.WithTokenTTL(15*time.Minute))
     if err != nil {
         log.Fatal(err)
     }

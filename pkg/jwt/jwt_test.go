@@ -25,7 +25,7 @@ const (
 func mustNewProvider(t *testing.T) *Provider {
 	t.Helper()
 
-	p, err := NewProvider(testIssuer)
+	p, err := NewProvider(testIssuer, mustRSAKey(t))
 	if err != nil {
 		t.Fatalf("NewProvider failed: %s", err.Error())
 	}
@@ -92,7 +92,7 @@ func TestProvider_IssueAndParse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Issue failed: %s", err.Error())
 	}
-	if jti == "" || expiresAt.Sub(*issuedAt) != tokenTTL {
+	if jti == "" || expiresAt.Sub(*issuedAt) != DefaultTokenTTL {
 		t.Fatalf("Issue returned jti %q, issued at %v and expiring at %v", jti, issuedAt, expiresAt)
 	}
 

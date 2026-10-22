@@ -9,11 +9,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const tokenTTL = time.Hour
-
+// Issue returns a token signed with the signing key, with its ID and the times when it is issued and expires.
 func (p *Provider) Issue(audience, subject, role string) (string, string, *time.Time, *time.Time, error) {
 	now := time.Now()
-	expiresAt := now.Add(tokenTTL)
+	expiresAt := now.Add(p.tokenTTL)
 	jti := uuid.New().String()
 	claims := CustomClaims{
 		role,
@@ -38,8 +37,21 @@ func (p *Provider) Issue(audience, subject, role string) (string, string, *time.
 	return signed, jti, &now, &expiresAt, nil
 }
 
+// Parse returns the claims of rawToken when it is valid: signed with the key of its "kid", which is the signing key or
+// one of the verification keys, issued by the provider for audience, and not expired.
 func (p *Provider) Parse(rawToken string, audience string) (*CustomClaims, bool) {
-	return parseToken(rawToken, p.issuer, audience, p.publicKey)
+	token, _, err := jwt.NewParser().ParseUnverified(rawToken, &CustomClaims{})
+	if err != nil {
+		return nil, false
+	}
+
+	keyID, _ := token.Header["kid"].(string)
+	publicKey, ok := p.verificationKeys[keyID]
+	if !ok {
+		return nil, false
+	}
+
+	return parseToken(rawToken, p.issuer, audience, publicKey)
 }
 
 func parseToken(rawToken, issuer, audience string, publicKey *rsa.PublicKey) (*CustomClaims, bool) {
