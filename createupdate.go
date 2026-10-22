@@ -31,7 +31,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		// The URL id is authoritative; any id in the JSON body is overwritten below.
 		obj, _, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
+			if errors.Is(err, svccrud.ErrNotFound) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
@@ -127,7 +127,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 				Ok:   true,
 				Code: jsonresp.CodeUniqueViolation,
 			})
-		case errors.Is(err, gocrud.ForeignKeyViolationError):
+		case errors.Is(err, gocrud.ErrForeignKeyViolation):
 			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeForeignKeyViolation,
@@ -140,8 +140,6 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		}
 		return
 	}
-	idInt = h.svc.ID(obj)
-
 	status := http.StatusCreated
 	code := jsonresp.CodeCreated
 	if id != "" {
@@ -153,7 +151,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		Ok:   true,
 		Code: code,
 		Data: map[string]interface{}{
-			"id": idInt,
+			"id": h.svc.ID(obj),
 		},
 	})
 }

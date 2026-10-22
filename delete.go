@@ -24,7 +24,7 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 	if route.AllowDelete != nil {
 		obj, _, err := h.svc.Read(ctx, key, idInt, nil, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
+			if errors.Is(err, svccrud.ErrNotFound) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
@@ -48,7 +48,7 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 
 	err = h.svc.Delete(ctx, key, idInt)
 	if err != nil {
-		if errors.Is(err, svccrud.NotFoundError) {
+		if errors.Is(err, svccrud.ErrNotFound) {
 			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeNotFound,
@@ -57,7 +57,7 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 		}
 
 		// other objects reference the object with a foreign key that does not allow deleting it
-		if errors.Is(err, gocrud.ForeignKeyViolationError) {
+		if errors.Is(err, gocrud.ErrForeignKeyViolation) {
 			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeForeignKeyViolation,
