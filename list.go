@@ -31,11 +31,11 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 	order := params.Get("order")
 	orderDirection := params.Get("order_direction")
 
-	var filterVals, filterOps map[string]string
+	var filters svccrud.Filters
 
 	if route.Flags&DisableFilters == 0 {
-		filterVals = make(map[string]string)
-		filterOps = make(map[string]string)
+		filters.Vals = make(map[string]string)
+		filters.Ops = make(map[string]string)
 
 		// Build allowed-filter lookup once (nil map means all fields are allowed).
 		var allowed map[string]bool
@@ -48,37 +48,27 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 
 		for name := range params {
 			if filterValRegexp.MatchString(name) {
-				field := strings.TrimPrefix(name, filterValPrefix)
-				if allowed == nil || allowed[field] {
-					filterVals[field] = params.Get(name)
+				key := strings.TrimPrefix(name, filterValPrefix)
+				if isFilterAllowed(allowed, key) {
+					filters.Vals[key] = params.Get(name)
 				}
 			}
 			if filterOpRegexp.MatchString(name) {
-				field := strings.TrimPrefix(name, filterOpPrefix)
-				if allowed == nil || allowed[field] {
-					filterOps[field] = params.Get(name)
+				key := strings.TrimPrefix(name, filterOpPrefix)
+				if isFilterAllowed(allowed, key) {
+					filters.Ops[key] = params.Get(name)
 				}
 			}
 		}
 	}
 
 	if route.FilterList != nil {
-		injected := route.FilterList(r)
-		if filterVals == nil {
-			filterVals = make(map[string]string)
-		}
-		if filterOps == nil {
-			filterOps = make(map[string]string)
-		}
-		for k, v := range injected.Vals {
-			filterVals[k] = v
-		}
-		for k, v := range injected.Ops {
-			filterOps[k] = v
-		}
+		scope := route.FilterList(r)
+		filters.ScopeVals = scope.Vals
+		filters.ScopeOps = scope.Ops
 	}
 
-	objs, _, err := h.svc.List(ctx, key, limit, offset, order, orderDirection, filterVals, filterOps, nil, route.ListConstructor, nil)
+	objs, _, err := h.svc.List(ctx, key, limit, offset, order, orderDirection, filters, nil, route.ListConstructor, nil)
 	if err != nil {
 		var validErr *svccrud.FilterValidationError
 		if errors.As(err, &validErr) {
@@ -122,4 +112,10 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 		Code: jsonresp.CodeSuccess,
 		Data: objs,
 	})
+}
+
+// isFilterAllowed checks if the field of a filter key, e.g. Name in Name.q, is allowed. A nil map allows every field.
+func isFilterAllowed(allowed map[string]bool, key string) bool {
+	field, _, _ := strings.Cut(key, ".")
+	return allowed == nil || allowed[field]
 }

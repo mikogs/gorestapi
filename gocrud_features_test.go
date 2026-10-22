@@ -187,11 +187,13 @@ func TestServe_ListFilters(t *testing.T) {
 	}
 
 	tests := map[string][]uint64{
-		"/orders/?order=ID&order_direction=asc&filter_val_Status=new,shipped&filter_op_Status=in":      {1, 3},
-		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=&filter_op_ShippedAt=eq":           {1, 2},
-		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=&filter_op_ShippedAt=ne":           {3},
-		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=2024-05-01&filter_op_ShippedAt=ge": {3},
-		"/orders/?order=ID&order_direction=DESC":                                                       {3, 2, 1},
+		"/orders/?order=ID&order_direction=asc&filter_val_Status=new,shipped&filter_op_Status=in":                                  {1, 3},
+		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=&filter_op_ShippedAt=eq":                                       {1, 2},
+		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=&filter_op_ShippedAt=ne":                                       {3},
+		"/orders/?order=ID&order_direction=asc&filter_val_ShippedAt=2024-05-01&filter_op_ShippedAt=ge":                             {3},
+		"/orders/?order=ID&order_direction=DESC":                                                                                   {3, 2, 1},
+		"/orders/?order=ID&order_direction=asc&filter_val_Status.q=new&filter_val_ShippedAt.q=2024-05-01&filter_op_ShippedAt.q=ge": {1, 3},
+		"/orders/?order=ID&order_direction=asc&filter_val_ID.min=2&filter_op_ID.min=ge&filter_val_ID.max=2&filter_op_ID.max=le":    {2},
 	}
 	for path, want := range tests {
 		if got := listIDs(t, h, path); !reflect.DeepEqual(got, want) {
@@ -241,5 +243,20 @@ func TestServe_IDInBodyIsIgnored(t *testing.T) {
 		if err != nil || customer.Name != name {
 			t.Fatalf("customer %d is %+v, %v, want %s", id, customer, err, name)
 		}
+	}
+}
+
+func TestServe_AllowedFiltersWithGroups(t *testing.T) {
+	h := apiHandler(t)
+	h.options.Routes["orders"] = Route{AllowedFilters: []string{"Status"}}
+
+	serveJSON(t, h, http.MethodPut, "/customers/", 1, map[string]interface{}{"name": "Acme"})
+	for _, status := range []string{"new", "paid"} {
+		serveJSON(t, h, http.MethodPut, "/orders/", 1, map[string]interface{}{"customer_id": 1, "status": status})
+	}
+
+	path := "/orders/?order=ID&order_direction=asc&filter_val_Status.q=paid&filter_val_ID.q=1"
+	if got := listIDs(t, h, path); !reflect.DeepEqual(got, []uint64{2}) {
+		t.Fatalf("GET %s returned orders %v, want [2], ignoring the filter that is not allowed", path, got)
 	}
 }

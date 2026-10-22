@@ -48,26 +48,32 @@ func TestFilterList_InjectsFilter(t *testing.T) {
 	}
 }
 
-// Injected filters must take precedence over conflicting client-supplied filters
-// so a caller cannot bypass server-side constraints.
-func TestFilterList_OverridesClientFilter(t *testing.T) {
+func TestFilterList_ClientFilterCannotBypassIt(t *testing.T) {
 	recreateTestStructTable()
 
 	insertTestStructsWithEmail(3, "owner@example.com")
 	insertTestStructsWithEmail(3, "other@example.com")
 
-	// Client tries to filter for "other", but the injected filter forces "owner".
-	req := httptest.NewRequest(http.MethodGet, "/teststruct/?limit=100&filter_val_PrimaryEmail=other@example.com&filter_op_PrimaryEmail=eq", nil)
-	w := httptest.NewRecorder()
+	tests := map[string]struct {
+		query string
+		want  int
+	}{
+		"condition on the same field": {"filter_val_PrimaryEmail=other@example.com", 0},
+		"group with the same field":   {"filter_val_PrimaryEmail.x=other@example.com&filter_val_Age.x=37", 3},
+	}
 
 	h := handlerWith(Route{FilterList: filterByEmail("owner@example.com")})
-	h.Serve(w, req)
+	for name, test := range tests {
+		req := httptest.NewRequest(http.MethodGet, "/teststruct/?limit=100&"+test.query, nil)
+		w := httptest.NewRecorder()
+		h.Serve(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected %d, got %d", http.StatusOK, w.Code)
-	}
-	if count := responseDataLen(t, w.Body.Bytes()); count != 3 {
-		t.Errorf("expected injected filter to win: want 3 owner rows, got %d", count)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: expected %d, got %d", name, http.StatusOK, w.Code)
+		}
+		if count := responseDataLen(t, w.Body.Bytes()); count != test.want {
+			t.Errorf("%s: want %d owner rows, got %d", name, test.want, count)
+		}
 	}
 }
 

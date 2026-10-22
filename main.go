@@ -29,8 +29,8 @@ const (
 )
 
 var (
-	filterValRegexp = regexp.MustCompile("^filter_val_[a-zA-Z0-9_]+$")
-	filterOpRegexp  = regexp.MustCompile("^filter_op_[a-zA-Z0-9_]+$")
+	filterValRegexp = regexp.MustCompile(`^filter_val_[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$`)
+	filterOpRegexp  = regexp.MustCompile(`^filter_op_[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$`)
 )
 
 // FilterSet holds server-side filters injected independently of client input.
@@ -71,15 +71,15 @@ type Route struct {
 	// serialised to JSON. Return non-nil to abort the entire list with 500.
 	PostListItem func(obj interface{}, r *http.Request) error
 
-	// FilterList returns server-side filters merged into every list request.
-	// Injected filters take precedence over client-supplied ones, so clients
-	// cannot override them.
+	// FilterList returns server-side filters applied to every list request.
+	// They are joined with AND around the client's filters, so clients cannot
+	// override them or widen them with filter groups.
 	FilterList func(r *http.Request) FilterSet
 
 	// FilterRead returns server-side filters applied when reading a single
-	// record by ID. The handler calls List(limit=1) with the injected filters
-	// plus the ID constraint; a mismatch returns 404 so record existence is
-	// not revealed to unauthorised callers.
+	// record by ID. The handler calls List(limit=1) with these filters and
+	// the ID; a mismatch returns 404 so record existence is not revealed to
+	// unauthorised callers.
 	FilterRead func(r *http.Request) FilterSet
 
 	// Per-operation constructor overrides. When nil the service's registered

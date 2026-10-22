@@ -23,18 +23,14 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 	var obj interface{}
 
 	if route.FilterRead != nil {
-		injected := route.FilterRead(r)
-		filterVals := make(map[string]string)
-		filterOps := make(map[string]string)
-		for k, v := range injected.Vals {
-			filterVals[k] = v
+		scope := route.FilterRead(r)
+		filters := svccrud.Filters{
+			Vals:      map[string]string{"ID": id},
+			ScopeVals: scope.Vals,
+			ScopeOps:  scope.Ops,
 		}
-		for k, v := range injected.Ops {
-			filterOps[k] = v
-		}
-		filterVals["ID"] = id // ID constraint always wins
 
-		objs, _, listErr := h.svc.List(ctx, key, 1, 0, "", "", filterVals, filterOps, nil, route.ReadConstructor, nil)
+		objs, _, listErr := h.svc.List(ctx, key, 1, 0, "", "", filters, nil, route.ReadConstructor, nil)
 		if listErr != nil {
 			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
 				Ok:   true,
