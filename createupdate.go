@@ -4,45 +4,30 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
-	"time"
 
-	"github.com/mikolajgasior/gocrud"
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonreq"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/registry"
+	"github.com/mikogs/gorestapi/pkg/jsonreq"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	var idInt uint64
 	var err error
-	var obj interface{}
+	var obj any
 
 	if id != "" {
-		idInt, err = strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeBadRequest,
-			})
-			return
-		}
-
-		// Use the override constructor — skip reading the existing record.
+		// Load the existing record, with the override constructor when it is set.
 		// The URL id is authoritative; any id in the JSON body is overwritten below.
-		obj, _, err = h.svc.Read(ctx, key, idInt, route.UpdateConstructor, nil)
+		obj, err = h.reg.Read(ctx, key, id, route.UpdateConstructor)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
+			if isNotFound(err) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
 				})
 				return
 			}
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			writeServiceError(w)
 			return
 		}
 
@@ -59,7 +44,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		if route.CreateConstructor != nil {
 			obj = route.CreateConstructor()
 		} else {
-			obj = h.svc.New(key)
+			obj = h.reg.New(key)
 		}
 	}
 
@@ -69,6 +54,18 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 			Ok:   true,
 			Code: jsonresp.CodeUnmarshalRequest,
 		})
+		return
+	}
+
+	// The id in the URL is authoritative, so that an id in the request body cannot make an update or a create
+	// write to another record, e.g. one that the Allow hooks would not allow. A create clears the id, and the
+	// record gets a new one. The id was read above, so it is valid.
+	var urlID any
+	if id != "" {
+		urlID = id
+	}
+	if err := gocrud.ObjSetIDValue(obj, urlID); err != nil {
+		h.logServiceError(ctx, w, "error setting the id", err)
 		return
 	}
 
@@ -82,58 +79,58 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	// When an update constructor is used the URL id must win over any id in the
-	// JSON body, so set it after unmarshalling.
-	if id != "" && route.UpdateConstructor != nil {
-		gocrud.ObjSetIDValue(obj, idInt)
-	}
-
 	if id == "" && route.PreCreate != nil {
 		if err := route.PreCreate(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.logServiceError(ctx, w, "error of PreCreate", err)
 			return
 		}
 	}
 	if id != "" && route.PreUpdate != nil {
 		if err := route.PreUpdate(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.logServiceError(ctx, w, "error of PreUpdate", err)
 			return
 		}
 	}
 
-	now := time.Now().UTC().Unix()
-	userID := uint64(0)
+	var userID any
 	if h.options.UserIDFunc != nil {
 		userID = h.options.UserIDFunc(r)
 	}
 
-	err = h.svc.Save(ctx, obj, now, userID)
+	err = h.reg.Save(ctx, obj, userID)
 	if err != nil {
-		var validErr *svccrud.ModelValidationError
-		if errors.As(err, &validErr) {
-			message := err.Error()
+		var validErr *registry.ModelValidationError
+		var uniqErr *gocrud.UniqError
+		switch {
+		case errors.As(err, &validErr):
+			// the error of the registry names the internal fields and relations, and is logged by it
+			message := "invalid object"
 			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
 				Ok:      true,
 				Code:    jsonresp.CodeValidationFailed,
 				Message: &message,
+				Data:    validErr.Violations,
 			})
-			return
+		case errors.As(err, &uniqErr):
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeUniqueViolation,
+			})
+		case errors.Is(err, gocrud.ErrForeignKeyViolation):
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeForeignKeyViolation,
+			})
+		case errors.Is(err, gocrud.ErrVersionConflict):
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeVersionConflict,
+			})
+		default:
+			writeServiceError(w)
 		}
-
-		jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-			Ok:   true,
-			Code: CodeServiceError,
-		})
 		return
 	}
-	idInt = h.svc.ID(obj)
-
 	status := http.StatusCreated
 	code := jsonresp.CodeCreated
 	if id != "" {
@@ -144,8 +141,8 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 	jsonresp.Write(w, status, &jsonresp.Response{
 		Ok:   true,
 		Code: code,
-		Data: map[string]interface{}{
-			"id": idInt,
+		Data: map[string]any{
+			"id": h.reg.ID(obj),
 		},
 	})
 }

@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 // Minimal struct variants that map to test_struct via the existing "_" name-stripping:
@@ -19,12 +19,12 @@ import (
 
 type TestStruct_Create struct {
 	ID  uint64
-	Key string `crud:"req uniq len:30,255"`
+	Key string `crud:"uniq" validate:"required,min=30,max=255"`
 }
 
 type TestStruct_Update struct {
 	ID        uint64
-	FirstName string `crud:"req len:2,30"`
+	FirstName string `validate:"required,min=2,max=30"`
 }
 
 type TestStruct_ReadOnly struct {
@@ -44,12 +44,12 @@ func TestServe_CreateConstructor(t *testing.T) {
 
 	key := "uniquekey-create-constructor-test-abc123"
 
-	body, _ := json.Marshal(map[string]interface{}{"Key": key})
+	body, _ := json.Marshal(map[string]any{"Key": key})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		CreateConstructor: func() interface{} { return &TestStruct_Create{} },
+		CreateConstructor: func() any { return &TestStruct_Create{} },
 	})
 	h.Serve(w, req)
 
@@ -58,8 +58,10 @@ func TestServe_CreateConstructor(t *testing.T) {
 	}
 
 	var resp jsonresp.Response
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	data := resp.Data.(map[string]interface{})
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
+	data := resp.Data.(map[string]any)
 	id := uint64(data["id"].(float64))
 	if id == 0 {
 		t.Fatalf("CreateConstructor: expected non-zero id in response")
@@ -67,7 +69,9 @@ func TestServe_CreateConstructor(t *testing.T) {
 
 	// Verify the row was actually inserted in the DB.
 	var count int
-	testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE id=$1 AND key=$2", id, key).Scan(&count)
+	if err := testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE id=$1 AND key=$2", id, key).Scan(&count); err != nil {
+		t.Fatalf("query failed: %s", err.Error())
+	}
 	if count != 1 {
 		t.Fatalf("CreateConstructor: record not found in DB (id=%d key=%s)", id, key)
 	}
@@ -79,15 +83,15 @@ func TestServe_UpdateConstructor(t *testing.T) {
 	recreateTestStructTable()
 
 	// Insert a full record first.
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "UpdatedViaOverride"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "UpdatedViaOverride"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
 	})
 	h.Serve(w, req)
 
@@ -97,8 +101,11 @@ func TestServe_UpdateConstructor(t *testing.T) {
 
 	// Verify FirstName was updated and PrimaryEmail was left untouched.
 	var firstName, primaryEmail string
-	testDB.QueryRow("SELECT first_name, primary_email FROM test_struct WHERE id=$1", original.ID).
+	err := testDB.QueryRow("SELECT first_name, primary_email FROM test_struct WHERE id=$1", original.ID).
 		Scan(&firstName, &primaryEmail)
+	if err != nil {
+		t.Fatalf("query failed: %s", err.Error())
+	}
 
 	if firstName != "UpdatedViaOverride" {
 		t.Errorf("UpdateConstructor: FirstName want %q, got %q", "UpdatedViaOverride", firstName)
@@ -113,14 +120,14 @@ func TestServe_UpdateConstructor(t *testing.T) {
 func TestServe_ReadConstructor(t *testing.T) {
 	recreateTestStructTable()
 
-	inserted := test.TestStructWithData()
+	inserted := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), inserted, gocrud.SaveOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teststruct/%d", inserted.ID), nil)
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		ReadConstructor: func() interface{} { return &TestStruct_ReadOnly{} },
+		ReadConstructor: func() any { return &TestStruct_ReadOnly{} },
 	})
 	h.Serve(w, req)
 
@@ -130,10 +137,14 @@ func TestServe_ReadConstructor(t *testing.T) {
 
 	// Unmarshal as a generic map to inspect which fields came back.
 	var resp jsonresp.Response
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
 	dataBytes, _ := json.Marshal(resp.Data)
-	var item map[string]interface{}
-	json.Unmarshal(dataBytes, &item)
+	var item map[string]any
+	if err := json.Unmarshal(dataBytes, &item); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
 
 	if _, ok := item["ID"]; !ok {
 		t.Errorf("ReadConstructor: expected ID field in response")
@@ -152,7 +163,7 @@ func TestServe_ListConstructor(t *testing.T) {
 	recreateTestStructTable()
 
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.Price = 100 + i
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
@@ -162,7 +173,7 @@ func TestServe_ListConstructor(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		ListConstructor: func() interface{} { return &TestStruct_ListOnly{} },
+		ListConstructor: func() any { return &TestStruct_ListOnly{} },
 	})
 	h.Serve(w, req)
 
@@ -171,16 +182,20 @@ func TestServe_ListConstructor(t *testing.T) {
 	}
 
 	var resp jsonresp.Response
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	items := resp.Data.([]interface{})
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
+	items := resp.Data.([]any)
 	if len(items) != 3 {
 		t.Fatalf("ListConstructor: expected 3 items, got %d", len(items))
 	}
 
 	// Each item should only have the fields from TestStruct_ListOnly.
 	itemBytes, _ := json.Marshal(items[0])
-	var item map[string]interface{}
-	json.Unmarshal(itemBytes, &item)
+	var item map[string]any
+	if err := json.Unmarshal(itemBytes, &item); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
 
 	if _, ok := item["ID"]; !ok {
 		t.Errorf("ListConstructor: expected ID field")

@@ -1,0 +1,33 @@
+name: test
+
+# Runs the checks and the tests, with PostgreSQL in docker, see scripts/test.sh, and the tests with the race detector
+# and the check for leaked goroutines, see scripts/concurcheck.sh.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: ./scripts/test.sh
+
+  concurcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: ./scripts/concurcheck.sh

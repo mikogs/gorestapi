@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
 )
 
 // ---------- AllowCreate ----------
@@ -19,13 +19,13 @@ import (
 func TestAllow_Create_Allows(t *testing.T) {
 	recreateTestStructTable()
 
-	body, _ := json.Marshal(map[string]interface{}{"Key": "allow-create-allows-00000000000000000"})
+	body, _ := json.Marshal(map[string]any{"Key": "allow-create-allows-00000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		CreateConstructor: func() interface{} { return &TestStruct_Create{} },
-		AllowCreate:       func(_ interface{}, _ *http.Request) error { return nil },
+		CreateConstructor: func() any { return &TestStruct_Create{} },
+		AllowCreate:       func(_ any, _ *http.Request) error { return nil },
 	})
 	h.Serve(w, req)
 
@@ -37,13 +37,13 @@ func TestAllow_Create_Allows(t *testing.T) {
 func TestAllow_Create_Rejects(t *testing.T) {
 	recreateTestStructTable()
 
-	body, _ := json.Marshal(map[string]interface{}{"Key": "allow-create-rejects-0000000000000000"})
+	body, _ := json.Marshal(map[string]any{"Key": "allow-create-rejects-0000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		CreateConstructor: func() interface{} { return &TestStruct_Create{} },
-		AllowCreate:       func(_ interface{}, _ *http.Request) error { return errors.New("forbidden") },
+		CreateConstructor: func() any { return &TestStruct_Create{} },
+		AllowCreate:       func(_ any, _ *http.Request) error { return errors.New("forbidden") },
 	})
 	h.Serve(w, req)
 
@@ -58,16 +58,16 @@ func TestAllow_Create_Rejects(t *testing.T) {
 func TestAllow_Update_Allows(t *testing.T) {
 	recreateTestStructTable()
 
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "Updated"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
-		AllowUpdate:       func(_ interface{}, _ *http.Request) error { return nil },
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
+		AllowUpdate:       func(_ any, _ *http.Request) error { return nil },
 	})
 	h.Serve(w, req)
 
@@ -79,16 +79,16 @@ func TestAllow_Update_Allows(t *testing.T) {
 func TestAllow_Update_Rejects(t *testing.T) {
 	recreateTestStructTable()
 
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "Updated"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
-		AllowUpdate:       func(_ interface{}, _ *http.Request) error { return errors.New("forbidden") },
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
+		AllowUpdate:       func(_ any, _ *http.Request) error { return errors.New("forbidden") },
 	})
 	h.Serve(w, req)
 
@@ -103,18 +103,18 @@ func TestAllow_Update_Rejects(t *testing.T) {
 func TestAllow_Update_ReceivesStoredRecord(t *testing.T) {
 	recreateTestStructTable()
 
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	original.FirstName = "StoredName"
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
 	var seenFirstName string
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "IncomingName"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "IncomingName"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
-		AllowUpdate: func(obj interface{}, _ *http.Request) error {
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
+		AllowUpdate: func(obj any, _ *http.Request) error {
 			if u, ok := obj.(*TestStruct_Update); ok {
 				seenFirstName = u.FirstName
 			}
@@ -133,14 +133,14 @@ func TestAllow_Update_ReceivesStoredRecord(t *testing.T) {
 func TestAllow_Read_Allows(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teststruct/%d", ts.ID), nil)
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		AllowRead: func(_ interface{}, _ *http.Request) error { return nil },
+		AllowRead: func(_ any, _ *http.Request) error { return nil },
 	})
 	h.Serve(w, req)
 
@@ -152,14 +152,14 @@ func TestAllow_Read_Allows(t *testing.T) {
 func TestAllow_Read_Rejects(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/teststruct/%d", ts.ID), nil)
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		AllowRead: func(_ interface{}, _ *http.Request) error { return errors.New("forbidden") },
+		AllowRead: func(_ any, _ *http.Request) error { return errors.New("forbidden") },
 	})
 	h.Serve(w, req)
 
@@ -174,14 +174,14 @@ func TestAllow_Read_Rejects(t *testing.T) {
 func TestAllow_Delete_Allows(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/teststruct/%d", ts.ID), nil)
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		AllowDelete: func(_ interface{}, _ *http.Request) error { return nil },
+		AllowDelete: func(_ any, _ *http.Request) error { return nil },
 	})
 	h.Serve(w, req)
 
@@ -193,14 +193,14 @@ func TestAllow_Delete_Allows(t *testing.T) {
 func TestAllow_Delete_Rejects(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/teststruct/%d", ts.ID), nil)
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		AllowDelete: func(_ interface{}, _ *http.Request) error { return errors.New("forbidden") },
+		AllowDelete: func(_ any, _ *http.Request) error { return errors.New("forbidden") },
 	})
 	h.Serve(w, req)
 

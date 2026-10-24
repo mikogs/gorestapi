@@ -1,67 +1,56 @@
 # Demo
 
-The `cmd/poc` directory contains a self-contained runnable server that demonstrates the most common gorestapi patterns: two resources, a create-only struct, ownership guards, and server-side filters. The walkthrough below follows that code.
+The `cmd/poc` directory contains a self-contained runnable server that demonstrates the most common gorestapi patterns: two resources related by a foreign key, ownership guards, and server-side filters. The walkthrough below follows that code.
 
 ## Resources
 
-Two structs are defined — `User` and `Note`. Each has a paired `_Draft` type used as the create payload; gocrud strips the underscore suffix to map it to the same table.
+Two structs are defined — `User` and `Note`. A note belongs to a user through a foreign key. Users have numeric IDs, and notes have UUIDs, so that the URLs of notes do not reveal how many there are.
 
 ```go
 type User struct {
     ID         uint64
-    Name       string `crud:"req len:1,100"`
-    Email      string `crud:"req email uniq"`
-    CreatedAt  int64
+    Name       string `validate:"required,max=100"`
+    Email      string `validate:"required,email" crud:"uniq"`
+    CreatedAt  time.Time
     CreatedBy  uint64
-    ModifiedAt int64
+    ModifiedAt time.Time
     ModifiedBy uint64
-}
-
-// User_Draft is the create payload — maps to the "user" table.
-type User_Draft struct {
-    ID    uint64
-    Name  string `crud:"req len:1,100"`
-    Email string `crud:"req email uniq"`
 }
 
 type Note struct {
-    ID         uint64
-    Title      string `crud:"req len:1,200"`
+    ID         string
+    Title      string `validate:"required,max=200"`
     Content    string
     Comment    string
-    UserID     uint64 `crud:"req"`
-    CreatedAt  int64
+    UserID     uint64 `validate:"required" crud:"idx fk:user on_delete:cascade"`
+    CreatedAt  time.Time
     CreatedBy  uint64
-    ModifiedAt int64
+    ModifiedAt time.Time
     ModifiedBy uint64
 }
-
-// Note_Draft is the create payload — maps to the "note" table.
-type Note_Draft struct {
-    ID      uint64
-    Title   string `crud:"req len:1,200"`
-    Content string
-    Comment string
-    UserID  uint64 `crud:"req"`
-}
 ```
 
-The `_Draft` types intentionally omit audit fields (`CreatedAt`, `ModifiedAt`, etc.) so clients cannot set them directly.
+* The `validate` tags are checked on every create and update, and a failure is returned as `400 VALIDATION_FAILED`.
+* `crud:"uniq"` makes the email unique. A second user with the same email is rejected with `409 UNIQUE_VIOLATION`.
+* `fk:user on_delete:cascade` makes `UserID` reference a user. A note of a user that does not exist is rejected with `409 FOREIGN_KEY_VIOLATION`, and deleting a user deletes their notes.
+* `ID string` makes gocrud generate a UUID for every new note, see [The ID Field](https://github.com/mikogs/gocrud/blob/main/docs/struct.md#1-the-id-field). The URL of a note is e.g. `/api/notes/0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d`.
+* `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` are set by gocrud, from the time of the request and the user returned by `UserIDFunc`. Values sent by clients are ignored, and an update never changes `CreatedAt` and `CreatedBy`.
 
-## Database and service
+## Database and registry
 
 ```go
-db, _ := sql.Open("sqlite", dbPath)
+// SQLite checks foreign keys only when they are enabled for the connection
+db, _ := sql.Open("sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)")
 
-svc := svccrud.New(map[string]func() interface{}{
-    "users": func() interface{} { return &User{} },
-    "notes": func() interface{} { return &Note{} },
-}, db, gocrud.DialectSQLite)
+reg := registry.New(map[string]func() any{
+    "users": func() any { return &User{} },
+    "notes": func() any { return &Note{} },
+}, db, gocrud.Options{Dialect: gocrud.DialectSQLite})
 
-svc.CreateTables(context.Background())
+reg.Migrate(context.Background())
 ```
 
-`CreateTables` creates both tables if they do not already exist. The service registry maps URL path segments to their constructors.
+`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The registry maps URL path segments to their constructors. In production, keep the changes of the tables in migration files instead, see [Versioned migrations](https://github.com/mikogs/gocrud/blob/main/docs/crud/versioned-migrations.md).
 
 ## Hooks
 
@@ -70,13 +59,8 @@ Two hooks shape note behavior.
 **`noteComment`** stamps every create and update with a server-controlled `Comment` field that clients cannot override:
 
 ```go
-noteComment := func(obj interface{}, _ *http.Request) error {
-    switch n := obj.(type) {
-    case *Note:
-        n.Comment = "Added with API"
-    case *Note_Draft:
-        n.Comment = "Added with API"
-    }
+noteComment := func(obj any, _ *http.Request) error {
+    obj.(*Note).Comment = "Added with API"
     return nil
 }
 ```
@@ -84,7 +68,7 @@ noteComment := func(obj interface{}, _ *http.Request) error {
 **`noteOwner`** rejects update and delete requests from users whose `X-User-ID` header does not match the note's stored `UserID`:
 
 ```go
-noteOwner := func(obj interface{}, r *http.Request) error {
+noteOwner := func(obj any, r *http.Request) error {
     note := obj.(*Note)
     headerUserID, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
     if note.UserID != headerUserID {
@@ -99,28 +83,25 @@ noteOwner := func(obj interface{}, r *http.Request) error {
 ## Handler
 
 ```go
-handler := gorestapi.New(svc, gorestapi.Options{
-    UserIDFunc: func(r *http.Request) uint64 {
+handler := gorestapi.New(reg, gorestapi.Options{
+    UserIDFunc: func(r *http.Request) any {
         id, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
         return id
     },
     Routes: map[string]gorestapi.Route{
-        "users": {
-            CreateConstructor: func() interface{} { return &User_Draft{} },
-        },
+        "users": {},
         "notes": {
-            CreateConstructor: func() interface{} { return &Note_Draft{} },
-            AllowedFilters:    []string{"UserID"},
-            AllowUpdate:       noteOwner,
-            AllowDelete:       noteOwner,
-            PreCreate:         noteComment,
-            PreUpdate:         noteComment,
-            PostRead: func(obj interface{}, _ *http.Request) error {
-                obj.(*Note).Comment = "Returned from gorestapi"
+            AllowedFilters: []string{"UserID"},
+            AllowUpdate:    noteOwner,
+            AllowDelete:    noteOwner,
+            PreCreate:      noteComment,
+            PreUpdate:      noteComment,
+            PostRead: func(obj any, _ *http.Request) error {
+                obj.(*Note).Comment = "Returned from gocrud"
                 return nil
             },
-            PostListItem: func(obj interface{}, _ *http.Request) error {
-                obj.(*Note).Comment = "Returned from gorestapi"
+            PostListItem: func(obj any, _ *http.Request) error {
+                obj.(*Note).Comment = "Returned from gocrud"
                 return nil
             },
             FilterList: func(r *http.Request) gorestapi.FilterSet {
@@ -138,7 +119,7 @@ handler := gorestapi.New(svc, gorestapi.Options{
 })
 ```
 
-`FilterList` and `FilterRead` automatically scope every notes query to the caller's user ID, so a user can only list and read their own notes. Injected filters take precedence over any client-supplied `filter_val_*` parameters.
+`FilterList` and `FilterRead` automatically scope every notes query to the caller's user ID, so a user can only list and read their own notes. They are joined with AND around any client-supplied `filter_val_*` parameters, so a client cannot widen them.
 
 ## Mounting
 
@@ -150,7 +131,8 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintln(w, "ok")
 })
 
-http.ListenAndServe(":"+port, mux)
+srv := &http.Server{Addr: ":" + port, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+log.Fatal(srv.ListenAndServe())
 ```
 
 ## Running
@@ -172,35 +154,39 @@ curl -s -X PUT http://localhost:8080/api/users/ \
   -H 'Content-Type: application/json' \
   -d '{"Name":"Alice","Email":"alice@example.com"}' | jq
 
-# Create a note owned by user 1
-curl -s -X PUT http://localhost:8080/api/notes/ \
+# Create a note owned by user 1, and keep its UUID
+NOTE_ID=$(curl -s -X PUT http://localhost:8080/api/notes/ \
   -H 'Content-Type: application/json' \
   -H 'X-User-ID: 1' \
-  -d '{"Title":"Hello","Content":"World","UserID":1}' | jq
+  -d '{"Title":"Hello","Content":"World","UserID":1}' | jq -r .data.id)
 
 # List notes — only the caller's notes are returned
 curl -s http://localhost:8080/api/notes/ \
   -H 'X-User-ID: 1' | jq
 
 # Read a single note (404 if UserID doesn't match)
-curl -s http://localhost:8080/api/notes/1 \
+curl -s http://localhost:8080/api/notes/$NOTE_ID \
   -H 'X-User-ID: 1' | jq
 
 # Update a note (403 if not the owner)
-curl -s -X PUT http://localhost:8080/api/notes/1 \
+curl -s -X PUT http://localhost:8080/api/notes/$NOTE_ID \
   -H 'Content-Type: application/json' \
   -H 'X-User-ID: 1' \
   -d '{"Title":"Updated"}' | jq
 
 # Delete a note (403 if not the owner)
-curl -s -X DELETE http://localhost:8080/api/notes/1 \
+curl -s -X DELETE http://localhost:8080/api/notes/$NOTE_ID \
   -H 'X-User-ID: 1' | jq
 ```
 
 | Request | Behaviour |
 |---|---|
 | `GET /api/notes/` | Returns only the caller's notes (UserID injected from header) |
-| `GET /api/notes/1` | Returns 404 if the note's UserID does not match the header |
-| `PUT /api/notes/` | Creates a note; `Comment` is stamped by `PreCreate` |
-| `PUT /api/notes/1` | Updates a note; returns 403 if the caller is not the owner |
-| `DELETE /api/notes/1` | Deletes a note; returns 403 if the caller is not the owner |
+| `GET /api/notes/{id}` | Returns 404 if the note's UserID does not match the header, or if `id` is not a UUID |
+| `PUT /api/notes/` | Creates a note with a new UUID, returned in `data.id`; `Comment` is stamped by `PreCreate` |
+| `PUT /api/notes/{id}` | Updates a note; returns 403 if the caller is not the owner |
+| `DELETE /api/notes/{id}` | Deletes a note; returns 403 if the caller is not the owner |
+| `PUT /api/users/` with an invalid email | Returns 400 `VALIDATION_FAILED`, with `{"Email": "email"}` in `data` |
+| `PUT /api/users/` with an email of another user | Returns 409 `UNIQUE_VIOLATION` |
+| `PUT /api/notes/` with the `UserID` of a user that does not exist | Returns 409 `FOREIGN_KEY_VIOLATION` |
+| `DELETE /api/users/1` | Deletes the user and, through the foreign key, their notes |

@@ -7,54 +7,57 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/service"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/registry"
 )
 
 // PassStruct — no json tags on the password field.
 // Table name: FieldToColumn("PassStruct") = "pass_struct"
 type PassStruct struct {
 	ID       uint64
-	Name     string `crud:"req len:1,100"`
+	Name     string `validate:"required,min=1,max=100"`
 	Password string `crud:"pass"`
-	Key      string `crud:"req uniq len:1,255"`
+	Key      string `crud:"uniq" validate:"required,min=1,max=255"`
 }
 
 // PassStructJson — password field carries a json tag.
 // "PassStructJson" has no underscore → table "pass_struct_json"
 type PassStructJson struct {
 	ID       uint64
-	Name     string `crud:"req len:1,100"`
+	Name     string `validate:"required,min=1,max=100"`
 	Password string `crud:"pass" json:"password"`
-	Key      string `crud:"req uniq len:1,255"`
+	Key      string `crud:"uniq" validate:"required,min=1,max=255"`
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-func passStructService() (*service.CRUD, *Handler) {
-	svc := service.New(map[string]func() interface{}{
-		"passstruct": func() interface{} { return &PassStruct{} },
-	}, testDB, gocrud.DialectPostgres)
-	h := New(svc, Options{
+func passStructService() (*registry.CRUD, *Handler) {
+	reg := registry.New(map[string]func() any{
+		"passstruct": func() any { return &PassStruct{} },
+	}, testDB, gocrud.Options{Dialect: gocrud.DialectPostgres})
+	h := New(reg, Options{
 		Routes: map[string]Route{
 			"passstruct": {},
 		},
 	})
-	return svc, h
+	return reg, h
 }
 
-func passStructJsonService() (*service.CRUD, *Handler) {
-	svc := service.New(map[string]func() interface{}{
-		"passstructjson": func() interface{} { return &PassStructJson{} },
-	}, testDB, gocrud.DialectPostgres)
-	h := New(svc, Options{
+func passStructJsonService() (*registry.CRUD, *Handler) {
+	reg := registry.New(map[string]func() any{
+		"passstructjson": func() any { return &PassStructJson{} },
+	}, testDB, gocrud.Options{Dialect: gocrud.DialectPostgres})
+	h := New(reg, Options{
 		Routes: map[string]Route{
 			"passstructjson": {},
 		},
 	})
-	return svc, h
+	return reg, h
 }
 
 func recreatePassStructTable() {
@@ -71,7 +74,7 @@ func recreatePassStructJsonTable() {
 func responseKeys(t *testing.T, body []byte) map[string]bool {
 	t.Helper()
 	var resp struct {
-		Data map[string]interface{} `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		t.Fatalf("responseKeys: unmarshal failed: %v", err)
@@ -87,7 +90,7 @@ func responseKeys(t *testing.T, body []byte) map[string]bool {
 func firstItemKeys(t *testing.T, body []byte) map[string]bool {
 	t.Helper()
 	var resp struct {
-		Data []map[string]interface{} `json:"data"`
+		Data []map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		t.Fatalf("firstItemKeys: unmarshal failed: %v", err)
@@ -219,7 +222,7 @@ func TestAPI_Read_NoPasswordField_UnaffectedResponse(t *testing.T) {
 
 	// Save a struct without a pass tag via the JSON body path to confirm
 	// that structs with no password fields still serialise normally.
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"Name": "grace",
 		"Key":  "key-no-pass-baseline-001",
 	})
@@ -234,7 +237,9 @@ func TestAPI_Read_NoPasswordField_UnaffectedResponse(t *testing.T) {
 	var created struct {
 		Data struct{ ID float64 } `json:"data"`
 	}
-	json.Unmarshal(wCreate.Body.Bytes(), &created)
+	if err := json.Unmarshal(wCreate.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal failed: %s", err.Error())
+	}
 	id := uint64(created.Data.ID)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/passstruct/%d", id), nil)
@@ -247,5 +252,48 @@ func TestAPI_Read_NoPasswordField_UnaffectedResponse(t *testing.T) {
 	keys := responseKeys(t, w.Body.Bytes())
 	if !keys["Name"] || !keys["ID"] {
 		t.Errorf("baseline: expected normal fields to be present, got keys: %v", keys)
+	}
+}
+
+func TestAPI_Update_Password(t *testing.T) {
+	recreatePassStructTable()
+	reg, h := passStructService()
+	ctx := context.Background()
+
+	obj := &PassStruct{Name: "alice", Password: "secret", Key: "k1"}
+	if err := reg.Save(ctx, obj, nil); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	path := fmt.Sprintf("/passstruct/%d", obj.ID)
+
+	verify := func(password string, want bool) {
+		t.Helper()
+		_, verified, err := reg.VerifyPasswords(ctx, "passstruct", registry.Filters{Vals: map[string]string{"ID": strconv.FormatUint(obj.ID, 10)}},
+			map[string]string{"Password": password})
+		if err != nil || verified != want {
+			t.Fatalf("verification of %q returned %t, %v, want %t", password, verified, err, want)
+		}
+	}
+
+	if code, resp := serveJSON(t, h, http.MethodPut, path, 0, map[string]string{"Name": "alicia", "Key": "k1"}); code != http.StatusOK {
+		t.Fatalf("PUT without a password returned %d %+v", code, resp)
+	}
+	verify("secret", true)
+	verify("", false)
+
+	if code, resp := serveJSON(t, h, http.MethodPut, path, 0, map[string]string{"Name": "alicia", "Key": "k1", "Password": "changed"}); code != http.StatusOK {
+		t.Fatalf("PUT with a password returned %d %+v", code, resp)
+	}
+	verify("changed", true)
+	verify("secret", false)
+}
+
+func TestAPI_Create_PasswordTooLong(t *testing.T) {
+	recreatePassStructTable()
+	_, h := passStructService()
+
+	code, resp := serveJSON(t, h, http.MethodPut, "/passstruct/", 0, map[string]string{"Name": "alice", "Key": "k1", "Password": strings.Repeat("x", 73)})
+	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{"Password": "max"}) {
+		t.Fatalf("PUT with a password that is too long returned %d %+v, want 400 with a max violation", code, resp)
 	}
 }

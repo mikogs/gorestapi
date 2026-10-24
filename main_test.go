@@ -6,10 +6,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/ory/dockertest/v3"
+	_ "github.com/lib/pq"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/gocrudtest"
+	"github.com/mikogs/gocrud/pkg/registry"
+	"github.com/mikogs/gorestapi/internal/fixtures"
 )
 
 var testUser = "testuser"
@@ -17,28 +18,23 @@ var testPassword = "testpass"
 var testName = "testdb"
 var testDB *sql.DB
 
-var dockerPool *dockertest.Pool
-var dockerResource *dockertest.Resource
+var dockerContainer *gocrudtest.Container
 
 var testCRUD *gocrud.CRUD
-var testService *service.CRUD
+var testService *registry.CRUD
 var testHandler *Handler
 
 func TestMain(m *testing.M) {
-	dockerPool, dockerResource, testDB = test.CreateDocker(testUser, testPassword, testName)
-
-	var code int
-
-	defer func() {
-		test.RemoveDocker(dockerPool, dockerResource)
-		os.Exit(code)
-	}()
+	dockerContainer, testDB = gocrudtest.CreateDocker(gocrudtest.PostgresDriver(), testUser, testPassword, testName)
 
 	createCRUD()
 	createService()
 	createHandler()
+	code := m.Run()
 
-	code = m.Run()
+	_ = testDB.Close()
+	gocrudtest.RemoveDocker(dockerContainer)
+	os.Exit(gocrudtest.CheckLeaks(code))
 }
 
 func createCRUD() {
@@ -46,11 +42,11 @@ func createCRUD() {
 }
 
 func createService() {
-	testService = service.New(map[string]func() interface{}{
-		"teststruct": func() interface{} {
-			return &test.TestStruct{}
+	testService = registry.New(map[string]func() any{
+		"teststruct": func() any {
+			return &fixtures.TestStruct{}
 		},
-	}, testDB, gocrud.DialectPostgres)
+	}, testDB, gocrud.Options{Dialect: gocrud.DialectPostgres})
 }
 
 func createHandler() {
@@ -62,6 +58,6 @@ func createHandler() {
 }
 
 func recreateTestStructTable() {
-	_ = testCRUD.DropTable(context.Background(), &test.TestStruct{})
-	_ = testCRUD.CreateTable(context.Background(), &test.TestStruct{})
+	_ = testCRUD.DropTable(context.Background(), &fixtures.TestStruct{})
+	_ = testCRUD.CreateTable(context.Background(), &fixtures.TestStruct{})
 }

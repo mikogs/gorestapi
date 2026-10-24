@@ -13,48 +13,33 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mikolajgasior/gocrud"
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/pkg/registry"
+	"github.com/mikogs/gorestapi"
 	_ "modernc.org/sqlite"
 )
 
 type User struct {
 	ID         uint64
-	Name       string `crud:"req len:1,100"`
-	Email      string `crud:"req email uniq"`
-	CreatedAt  int64
+	Name       string `validate:"required,max=100"`
+	Email      string `validate:"required,email" crud:"uniq"`
+	CreatedAt  time.Time
 	CreatedBy  uint64
-	ModifiedAt int64
+	ModifiedAt time.Time
 	ModifiedBy uint64
 }
 
-// User_Draft is the create payload; the underscore tells gocrud to use the "user" table.
-type User_Draft struct {
-	ID    uint64
-	Name  string `crud:"req len:1,100"`
-	Email string `crud:"req email uniq"`
-}
-
+// Note has a UUID, so that the URLs of notes do not reveal how many there are.
 type Note struct {
-	ID         uint64
-	Title      string `crud:"req len:1,200"`
+	ID         string
+	Title      string `validate:"required,max=200"`
 	Content    string
 	Comment    string
-	UserID     uint64 `crud:"req"`
-	CreatedAt  int64
+	UserID     uint64 `validate:"required" crud:"idx fk:user on_delete:cascade"`
+	CreatedAt  time.Time
 	CreatedBy  uint64
-	ModifiedAt int64
+	ModifiedAt time.Time
 	ModifiedBy uint64
-}
-
-// Note_Draft is the create payload; the underscore tells gocrud to use the "note" table.
-type Note_Draft struct {
-	ID      uint64
-	Title   string `crud:"req len:1,200"`
-	Content string
-	Comment string
-	UserID  uint64 `crud:"req"`
 }
 
 func main() {
@@ -68,42 +53,39 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	// SQLite checks foreign keys only when they are enabled for the connection
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?_pragma=foreign_keys(1)")
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	svc := svccrud.New(map[string]func() interface{}{
-		"users": func() interface{} { return &User{} },
-		"notes": func() interface{} { return &Note{} },
-	}, db, gocrud.DialectSQLite)
+	reg := registry.New(map[string]func() any{
+		"users": func() any { return &User{} },
+		"notes": func() any { return &Note{} },
+	}, db, gocrud.Options{Dialect: gocrud.DialectSQLite})
 
-	if err := svc.CreateTables(context.Background()); err != nil {
-		slog.Error("failed to create tables", "error", err)
+	// Migrate creates the tables, and adds the columns of new fields to existing ones
+	if _, err := reg.Migrate(context.Background()); err != nil {
+		slog.Error("failed to migrate tables", "error", err)
 		os.Exit(1)
 	}
 
 	// X-User-ID is intentionally simple — a real app would use JWT or sessions.
-	userIDFromRequest := func(r *http.Request) uint64 {
+	userIDFromRequest := func(r *http.Request) any {
 		id, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
 		return id
 	}
 
 	// noteComment stamps every create and update with a server-controlled comment.
-	noteComment := func(obj interface{}, _ *http.Request) error {
-		switch n := obj.(type) {
-		case *Note:
-			n.Comment = "Added with API"
-		case *Note_Draft:
-			n.Comment = "Added with API"
-		}
+	noteComment := func(obj any, _ *http.Request) error {
+		obj.(*Note).Comment = "Added with API"
 		return nil
 	}
 
 	// noteOwner rejects requests where X-User-ID does not match the note's UserID.
-	noteOwner := func(obj interface{}, r *http.Request) error {
+	noteOwner := func(obj any, r *http.Request) error {
 		note := obj.(*Note)
 		headerUserID, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
 		if note.UserID != headerUserID {
@@ -112,24 +94,23 @@ func main() {
 		return nil
 	}
 
-	handler := gorestapi.New(svc, gorestapi.Options{
+	handler := gorestapi.New(reg, gorestapi.Options{
 		UserIDFunc: userIDFromRequest,
 		Routes: map[string]gorestapi.Route{
-			"users": {
-				CreateConstructor: func() interface{} { return &User_Draft{} },
-			},
+			// The audit fields (CreatedAt, CreatedBy, ModifiedAt, ModifiedBy) are set by gocrud,
+			// which ignores the values sent by clients.
+			"users": {},
 			"notes": {
-				CreateConstructor: func() interface{} { return &Note_Draft{} },
-				AllowedFilters:    []string{"UserID"},
-				AllowUpdate:       noteOwner,
-				AllowDelete:       noteOwner,
-				PreCreate:         noteComment,
-				PreUpdate:         noteComment,
-				PostRead: func(obj interface{}, _ *http.Request) error {
+				AllowedFilters: []string{"UserID"},
+				AllowUpdate:    noteOwner,
+				AllowDelete:    noteOwner,
+				PreCreate:      noteComment,
+				PreUpdate:      noteComment,
+				PostRead: func(obj any, _ *http.Request) error {
 					obj.(*Note).Comment = "Returned from gocrud"
 					return nil
 				},
-				PostListItem: func(obj interface{}, _ *http.Request) error {
+				PostListItem: func(obj any, _ *http.Request) error {
 					obj.(*Note).Comment = "Returned from gocrud"
 					return nil
 				},
@@ -151,10 +132,18 @@ func main() {
 	mux.Handle("/api/", http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 
-	srv := &http.Server{Addr: ":" + port, Handler: mux}
+	// the timeouts keep slow clients from holding connections open, e.g. by sending the headers byte by byte
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       time.Minute,
+		WriteTimeout:      time.Minute,
+		IdleTimeout:       2 * time.Minute,
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
 )
 
 // ---------- PreCreate ----------
@@ -22,13 +22,13 @@ func TestPreCreate_MutatesObject(t *testing.T) {
 	clientKey := "precreate-client-key-000000000000000"
 	serverKey := "precreate-server-key-000000000000000"
 
-	body, _ := json.Marshal(map[string]interface{}{"Key": clientKey})
+	body, _ := json.Marshal(map[string]any{"Key": clientKey})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		CreateConstructor: func() interface{} { return &TestStruct_Create{} },
-		PreCreate: func(obj interface{}, _ *http.Request) error {
+		CreateConstructor: func() any { return &TestStruct_Create{} },
+		PreCreate: func(obj any, _ *http.Request) error {
 			obj.(*TestStruct_Create).Key = serverKey
 			return nil
 		},
@@ -40,12 +40,16 @@ func TestPreCreate_MutatesObject(t *testing.T) {
 	}
 
 	var count int
-	testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE key = $1", serverKey).Scan(&count)
+	if err := testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE key = $1", serverKey).Scan(&count); err != nil {
+		t.Fatalf("query failed: %s", err.Error())
+	}
 	if count != 1 {
 		t.Errorf("PreCreate: server key %q not found in DB — hook did not mutate the object", serverKey)
 	}
 
-	testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE key = $1", clientKey).Scan(&count)
+	if err := testDB.QueryRow("SELECT COUNT(*) FROM test_struct WHERE key = $1", clientKey).Scan(&count); err != nil {
+		t.Fatalf("query failed: %s", err.Error())
+	}
 	if count != 0 {
 		t.Errorf("PreCreate: client key %q should have been overridden", clientKey)
 	}
@@ -54,13 +58,13 @@ func TestPreCreate_MutatesObject(t *testing.T) {
 func TestPreCreate_ErrorAbortsCreate(t *testing.T) {
 	recreateTestStructTable()
 
-	body, _ := json.Marshal(map[string]interface{}{"Key": "precreate-error-key-000000000000000"})
+	body, _ := json.Marshal(map[string]any{"Key": "precreate-error-key-000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		CreateConstructor: func() interface{} { return &TestStruct_Create{} },
-		PreCreate: func(_ interface{}, _ *http.Request) error {
+		CreateConstructor: func() any { return &TestStruct_Create{} },
+		PreCreate: func(_ any, _ *http.Request) error {
 			return errors.New("pre-create failure")
 		},
 	})
@@ -76,17 +80,17 @@ func TestPreCreate_ErrorAbortsCreate(t *testing.T) {
 func TestPreUpdate_MutatesObject(t *testing.T) {
 	recreateTestStructTable()
 
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	original.FirstName = "Before"
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "FromClient"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "FromClient"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
-		PreUpdate: func(obj interface{}, _ *http.Request) error {
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
+		PreUpdate: func(obj any, _ *http.Request) error {
 			obj.(*TestStruct_Update).FirstName = "FromServer"
 			return nil
 		},
@@ -98,7 +102,9 @@ func TestPreUpdate_MutatesObject(t *testing.T) {
 	}
 
 	var saved string
-	testDB.QueryRow("SELECT first_name FROM test_struct WHERE id = $1", original.ID).Scan(&saved)
+	if err := testDB.QueryRow("SELECT first_name FROM test_struct WHERE id = $1", original.ID).Scan(&saved); err != nil {
+		t.Fatalf("query failed: %s", err.Error())
+	}
 	if saved != "FromServer" {
 		t.Errorf("PreUpdate: want %q in DB, got %q — hook did not mutate the object", "FromServer", saved)
 	}
@@ -107,16 +113,16 @@ func TestPreUpdate_MutatesObject(t *testing.T) {
 func TestPreUpdate_ErrorAbortsUpdate(t *testing.T) {
 	recreateTestStructTable()
 
-	original := test.TestStructWithData()
+	original := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), original, gocrud.SaveOptions{})
 
-	body, _ := json.Marshal(map[string]interface{}{"FirstName": "Updated"})
+	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
-		UpdateConstructor: func() interface{} { return &TestStruct_Update{} },
-		PreUpdate: func(_ interface{}, _ *http.Request) error {
+		UpdateConstructor: func() any { return &TestStruct_Update{} },
+		PreUpdate: func(_ any, _ *http.Request) error {
 			return errors.New("pre-update failure")
 		},
 	})

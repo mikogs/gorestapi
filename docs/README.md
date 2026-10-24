@@ -1,22 +1,24 @@
 # Overview
 
-**gorestapi** is a Go package that mounts a ready-made JSON REST API on top of a [gocrud](https://github.com/mikolajgasior/gocrud) service. A single handler covers list, read, create, update, and delete for every route you register — with no code generation and no framework lock-in.
+The pages of the documentation are listed in the [README](../README.md#documentation).
+
+**gorestapi** is a Go package that mounts a ready-made JSON REST API on top of a [gocrud](https://github.com/mikogs/gocrud) registry. A single handler covers list, read, create, update, and delete for every route you register — with no code generation and no framework lock-in.
 
 ## How it works
 
-1. Define your structs and register them with a gocrud service.
+1. Define your structs and register them in a gocrud registry.
 2. Configure one `Route` per URL path segment.
 3. Mount the handler on any `http.ServeMux`.
 
 ```go
 import (
-    "github.com/mikolajgasior/gorestapi"
-    svccrud "github.com/mikolajgasior/gocrud/pkg/service"
+    "github.com/mikogs/gorestapi"
+    "github.com/mikogs/gocrud/pkg/registry"
 )
 
-svc := svccrud.New(registry, db, gocrud.DialectPostgres)
+reg := registry.New(structs, db, gocrud.Options{Dialect: gocrud.DialectPostgres})
 
-handler := gorestapi.New(svc, gorestapi.Options{
+handler := gorestapi.New(reg, gorestapi.Options{
     Routes: map[string]gorestapi.Route{
         "notes": {},
     },
@@ -42,13 +44,13 @@ gorestapi delegates all persistence to gocrud, which supports:
 
 | Database | Driver |
 |---|---|
-| PostgreSQL | `github.com/lib/pq` |
+| PostgreSQL | `github.com/lib/pq` or `github.com/jackc/pgx/v5/stdlib` |
 | SQLite | `modernc.org/sqlite` |
 
 ## Installation
 
 ```
-go get github.com/mikolajgasior/gorestapi
+go get github.com/mikogs/gorestapi
 ```
 
 ## Demo

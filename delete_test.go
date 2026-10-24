@@ -7,15 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
 )
 
 func TestServe_Delete(t *testing.T) {
 	recreateTestStructTable()
 
 	// Insert an object first
-	objSaved := test.TestStructWithData()
+	objSaved := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), objSaved, gocrud.SaveOptions{})
 
 	// Delete it
@@ -28,7 +28,7 @@ func TestServe_Delete(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
-	test.FatalIfTestStructNotDeletedInTheDatabase(t, testDB, objSaved.ID)
+	fixtures.FatalIfTestStructNotDeletedInTheDatabase(t, testDB, objSaved.ID)
 
 	// Try to delete it again - should return NotFound
 	req = httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/teststruct/%d", objSaved.ID), nil)

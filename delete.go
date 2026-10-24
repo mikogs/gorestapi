@@ -4,36 +4,23 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeBadRequest,
-		})
-		return
-	}
-
 	if route.AllowDelete != nil {
-		obj, _, err := h.svc.Read(ctx, key, idInt, nil, nil)
+		obj, err := h.reg.Read(ctx, key, id, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
+			if isNotFound(err) {
 				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 					Ok:   true,
 					Code: jsonresp.CodeNotFound,
 				})
 				return
 			}
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			writeServiceError(w)
 			return
 		}
 		if err := route.AllowDelete(obj, r); err != nil {
@@ -45,9 +32,9 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 		}
 	}
 
-	err = h.svc.Delete(ctx, key, idInt)
+	err := h.reg.Delete(ctx, key, id)
 	if err != nil {
-		if errors.Is(err, svccrud.NotFoundError) {
+		if isNotFound(err) {
 			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
 				Ok:   true,
 				Code: jsonresp.CodeNotFound,
@@ -55,10 +42,16 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 			return
 		}
 
-		jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-			Ok:   true,
-			Code: CodeServiceError,
-		})
+		// other objects reference the object with a foreign key that does not allow deleting it
+		if errors.Is(err, gocrud.ErrForeignKeyViolation) {
+			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
+				Ok:   true,
+				Code: jsonresp.CodeForeignKeyViolation,
+			})
+			return
+		}
+
+		writeServiceError(w)
 		return
 	}
 

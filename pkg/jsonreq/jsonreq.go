@@ -9,7 +9,7 @@ import (
 
 const maxBodyBytes = 1 << 20 // 1 MiB
 
-func Unmarshal(r *http.Request, v interface{}) error {
+func Unmarshal(r *http.Request, v any) error {
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
 	if err != nil {
 		return fmt.Errorf("read request body: %w", err)

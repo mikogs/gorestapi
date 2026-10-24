@@ -1,0 +1,23 @@
+name: lint
+
+# Runs the static analysis, golangci-lint with gosec and gosec itself, see scripts/lint.sh. govulncheck runs in the
+# vulncheck workflow.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: ./scripts/lint.sh
