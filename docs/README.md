@@ -53,6 +53,8 @@ gorestapi delegates all persistence to gocrud, which supports:
 go get github.com/mikogs/gorestapi
 ```
 
+It adds gocrud `v1.0.0-rc.1` too. Import the driver of the database yourself, see [Supported databases](#supported-databases).
+
 ## Demo
 
 See [Demo](demo.md) for a complete runnable example covering two resources, ownership hooks, and server-side filters.

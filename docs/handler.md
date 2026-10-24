@@ -17,7 +17,7 @@ handler := gorestapi.New(reg, gorestapi.Options{})
 
 | Argument | Type | Description |
 |---|---|---|
-| `reg` | `*registry.CRUD` | A registry of the structs, see [Registry](https://github.com/mikogs/gocrud/blob/main/docs/pkgs/registry.md) |
+| `reg` | `*registry.CRUD` | A registry of the structs, see [Registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/pkgs/registry.md) |
 | `options` | `gorestapi.Options` | Configuration for the handler (zero value is valid) |
 
 ### Options
@@ -270,7 +270,7 @@ The handler logs with `log/slog`, with the `Logger` of the options, or `slog.Def
 * **A relation path** of `AllowedFilters` that cannot be used, once, as a warning, see [Route](#route).
 * **An invalid ID** in a URL, at the debug level.
 
-The errors of the queries are logged by the [registry](https://github.com/mikogs/gocrud/blob/main/docs/pkgs/registry.md#logging): at the error level for the errors of the database, which are `500` responses, and at the debug level for the errors of a request, e.g. a validation error, which are `400`, `404` and `409` responses. They are not logged again by the handler. Set the logger of the registry with `WithLogger`:
+The errors of the queries are logged by the [registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/pkgs/registry.md#logging): at the error level for the errors of the database, which are `500` responses, and at the debug level for the errors of a request, e.g. a validation error, which are `400`, `404` and `409` responses. They are not logged again by the handler. Set the logger of the registry with `WithLogger`:
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
@@ -280,7 +280,7 @@ handler := gorestapi.New(reg, gorestapi.Options{Routes: routes, Logger: logger})
 
 ## Metrics
 
-gorestapi does not depend on a library of metrics. The metrics of the requests are measured around `handler.Serve`, in a middleware, and the metrics of the queries with the [query hook](https://github.com/mikogs/gocrud/blob/main/docs/crud/init.md#metrics) of gocrud, in `gocrud.Options` of the registry.
+gorestapi does not depend on a library of metrics. The metrics of the requests are measured around `handler.Serve`, in a middleware, and the metrics of the queries with the [query hook](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/crud/init.md#metrics) of gocrud, in `gocrud.Options` of the registry.
 
 Label the requests with `handler.RoutePath(r)`, the path of the route, e.g. `notes` for `/notes/42`, or an empty string for a path that is not a route. Not with the path of the request: it has the IDs, and any path that a client sends, so each of them would be a new time series. E.g. with [Prometheus](https://github.com/prometheus/client_golang):
 
@@ -323,7 +323,7 @@ srv := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 10 * time.Se
 log.Fatal(srv.ListenAndServe())
 ```
 
-After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional record ID: a number, or a UUID for structs with a `string` ID, see [The ID Field](https://github.com/mikogs/gocrud/blob/main/docs/struct.md#1-the-id-field).
+After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional record ID: a number, or a UUID for structs with a `string` ID, see [The ID Field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/struct.md#1-the-id-field).
 
 ## URL scheme
 
@@ -368,9 +368,9 @@ Returns a paginated, filtered list of records.
 | `filter_val_{Field}` | string | — | Filter value for the named field |
 | `filter_op_{Field}` | string | `eq` | Filter operator for the named field: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `like`, `match` (PostgreSQL only, with the flag `EnableMatchFilters`), `bit` or `in` |
 
-Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`, up to [`MaxInValues`](#options). Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud registry](https://github.com/mikogs/gocrud/blob/main/docs/pkgs/registry.md) for the details.
+Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`, up to [`MaxInValues`](#options). Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/pkgs/registry.md) for the details.
 
-**Filters on related records.** A field can be a path through relation fields, e.g. `filter_val_Customer.Country=PL` for the orders of customers from Poland, or `filter_val_Items.Product=Mouse` for the orders with such an item, when the path is listed in [`AllowedFilters`](#route), and clients can read its value through a route of the related records. See [Conditions on related records](https://github.com/mikogs/gocrud/blob/main/docs/crud/ops.md#conditions-on-related-records) for the details.
+**Filters on related records.** A field can be a path through relation fields, e.g. `filter_val_Customer.Country=PL` for the orders of customers from Poland, or `filter_val_Items.Product=Mouse` for the orders with such an item, when the path is listed in [`AllowedFilters`](#route), and clients can read its value through a route of the related records. See [Conditions on related records](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/crud/ops.md#conditions-on-related-records) for the details.
 
 **Filter groups.** The filters are joined with AND. To join filters with OR, put them in a group, by adding the same name of letters, digits or underscores after the field name and a tilde, e.g. `q` in `filter_val_Title~q` and `filter_op_Title~q`. The filters of a group are joined with OR, and the group with AND with the other filters and groups.
 
@@ -396,7 +396,7 @@ An invalid filter is a `400 VALIDATION_FAILED` response, with the failed rules i
 
 When no records match, `data` is an empty list, `[]`.
 
-**Pages with cursors.** A full page, with `limit` records, has the cursor of the next page in `meta.next`. Pass it as `after`, with the same `limit`, `order`, `order_direction` and filters, to get the records after the last one of the page, e.g. `GET /notes/?limit=20&order=CreatedAt&order_direction=desc&after=eyJv...`. Unlike `offset`, the database reads only the records of the page, also of the last pages of a large table, and no record is missed or repeated when records are added or deleted while the client reads the pages. The page after the last one is empty. See [Pages with cursors](https://github.com/mikogs/gocrud/blob/main/docs/crud/ops.md#pages-with-cursors) for the details.
+**Pages with cursors.** A full page, with `limit` records, has the cursor of the next page in `meta.next`. Pass it as `after`, with the same `limit`, `order`, `order_direction` and filters, to get the records after the last one of the page, e.g. `GET /notes/?limit=20&order=CreatedAt&order_direction=desc&after=eyJv...`. Unlike `offset`, the database reads only the records of the page, also of the last pages of a large table, and no record is missed or repeated when records are added or deleted while the client reads the pages. The page after the last one is empty. See [Pages with cursors](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/crud/ops.md#pages-with-cursors) for the details.
 
 * A cursor of another order, or a string that is not a cursor, is a `400 VALIDATION_FAILED` response with the message `invalid cursor` and `{"after": "type"}`, and so is `after` with `offset`.
 * An `order` of a nullable field cannot be in a cursor, so its pages have no `meta.next`, and are read with `offset`.
@@ -444,7 +444,7 @@ Creates a new record. The request body must be a JSON object whose keys match th
 
 For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d"`.
 
-**Response `400 Bad Request`** (validation failure). `data` maps the fields that failed to the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/main/docs/struct.md#validation-errors):
+**Response `400 Bad Request`** (validation failure). `data` maps the fields that failed to the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/struct.md#validation-errors):
 ```json
 {
   "ok": true,
@@ -454,7 +454,7 @@ For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4
 }
 ```
 
-**Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist, and `VERSION_CONFLICT` when the record has a [version field](https://github.com/mikogs/gocrud/blob/main/docs/struct.md#10-version) and the body has a version other than the stored one, as the record was changed since the client read it. A body without the version is saved with the version that was read, so only a client that sends the version it read is protected from overwriting another change.
+**Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist, and `VERSION_CONFLICT` when the record has a [version field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/struct.md#10-version) and the body has a version other than the stored one, as the record was changed since the client read it. A body without the version is saved with the version that was read, so only a client that sends the version it read is protected from overwriting another change.
 
 ---
 

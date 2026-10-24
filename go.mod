@@ -9,7 +9,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.12.3
-	github.com/mikogs/gocrud v0.0.0
+	github.com/mikogs/gocrud v1.0.0-rc.1
 	modernc.org/sqlite v1.61.0
 )
 
@@ -32,6 +32,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
-
-// TODO: replace with the released version of gocrud
-replace github.com/mikogs/gocrud => ../gocrud

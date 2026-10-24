@@ -33,7 +33,7 @@ type Note struct {
 * The `validate` tags are checked on every create and update, and a failure is returned as `400 VALIDATION_FAILED`.
 * `crud:"uniq"` makes the email unique. A second user with the same email is rejected with `409 UNIQUE_VIOLATION`.
 * `fk:user on_delete:cascade` makes `UserID` reference a user. A note of a user that does not exist is rejected with `409 FOREIGN_KEY_VIOLATION`, and deleting a user deletes their notes.
-* `ID string` makes gocrud generate a UUID for every new note, see [The ID Field](https://github.com/mikogs/gocrud/blob/main/docs/struct.md#1-the-id-field). The URL of a note is e.g. `/api/notes/0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d`.
+* `ID string` makes gocrud generate a UUID for every new note, see [The ID Field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/struct.md#1-the-id-field). The URL of a note is e.g. `/api/notes/0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d`.
 * `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` are set by gocrud, from the time of the request and the user returned by `UserIDFunc`. Values sent by clients are ignored, and an update never changes `CreatedAt` and `CreatedBy`.
 
 ## Database and registry
@@ -50,7 +50,7 @@ reg := registry.New(map[string]func() any{
 reg.Migrate(context.Background())
 ```
 
-`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The registry maps URL path segments to their constructors. In production, keep the changes of the tables in migration files instead, see [Versioned migrations](https://github.com/mikogs/gocrud/blob/main/docs/crud/versioned-migrations.md).
+`Migrate` creates the tables that do not exist yet, the `user` table before the `note` table that references it, and adds the columns of new fields to existing tables. The registry maps URL path segments to their constructors. In production, keep the changes of the tables in migration files instead, see [Versioned migrations](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.1/docs/crud/versioned-migrations.md).
 
 ## Hooks
 
