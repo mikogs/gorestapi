@@ -14,20 +14,14 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 		obj, err := h.reg.Read(ctx, key, id, nil)
 		if err != nil {
 			if isNotFound(err) {
-				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-					Ok:   true,
-					Code: jsonresp.CodeNotFound,
-				})
+				h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 				return
 			}
-			writeServiceError(w)
+			h.writeServiceError(w, r)
 			return
 		}
 		if err := route.AllowDelete(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeForbidden,
-			})
+			h.writeProblem(w, r, CodeForbidden, "", nil)
 			return
 		}
 	}
@@ -35,23 +29,17 @@ func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r 
 	err := h.reg.Delete(ctx, key, id)
 	if err != nil {
 		if isNotFound(err) {
-			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeNotFound,
-			})
+			h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 			return
 		}
 
 		// other objects reference the object with a foreign key that does not allow deleting it
 		if errors.Is(err, gocrud.ErrForeignKeyViolation) {
-			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeForeignKeyViolation,
-			})
+			h.writeProblem(w, r, jsonresp.CodeForeignKeyViolation, "Other records reference the record.", nil)
 			return
 		}
 
-		writeServiceError(w)
+		h.writeServiceError(w, r)
 		return
 	}
 

@@ -101,7 +101,7 @@ func TestAPI_RelationPaths_Refused(t *testing.T) {
 				fatalIfOrders(t, h, "/orders/?order=ID&"+filter, []uint64{1, 2})
 			}
 			code, resp := serveJSON(t, h, http.MethodGet, "/orders/?order=Customer.Name", 0, nil)
-			if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{"Customer.Name": "type"}) {
+			if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, map[string]string{"Customer.Name": "type"}) {
 				t.Fatalf("an order by a path returned %d %+v, want 400", code, resp)
 			}
 		})

@@ -10,6 +10,7 @@ cd "$(dirname "$0")/.."
 
 echo "== golangci-lint"
 go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION" run ./...
+(cd cmd/poc && go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION" run ./...)
 
 echo "== gosec"
 go run "github.com/securego/gosec/v2/cmd/gosec@$GOSEC_VERSION" -quiet -tests ./...

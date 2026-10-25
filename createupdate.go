@@ -21,22 +21,16 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		obj, err = h.reg.Read(ctx, key, id, route.UpdateConstructor)
 		if err != nil {
 			if isNotFound(err) {
-				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-					Ok:   true,
-					Code: jsonresp.CodeNotFound,
-				})
+				h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 				return
 			}
-			writeServiceError(w)
+			h.writeServiceError(w, r)
 			return
 		}
 
 		if route.AllowUpdate != nil {
 			if err := route.AllowUpdate(obj, r); err != nil {
-				jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-					Ok:   true,
-					Code: CodeForbidden,
-				})
+				h.writeProblem(w, r, CodeForbidden, "", nil)
 				return
 			}
 		}
@@ -50,10 +44,7 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 
 	err = jsonreq.Unmarshal(r, &obj)
 	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeUnmarshalRequest,
-		})
+		h.writeProblem(w, r, jsonresp.CodeUnmarshalRequest, "", nil)
 		return
 	}
 
@@ -65,29 +56,26 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		urlID = id
 	}
 	if err := gocrud.ObjSetIDValue(obj, urlID); err != nil {
-		h.logServiceError(ctx, w, "error setting the id", err)
+		h.logServiceError(w, r, "error setting the id", err)
 		return
 	}
 
 	if id == "" && route.AllowCreate != nil {
 		if err := route.AllowCreate(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeForbidden,
-			})
+			h.writeProblem(w, r, CodeForbidden, "", nil)
 			return
 		}
 	}
 
 	if id == "" && route.PreCreate != nil {
 		if err := route.PreCreate(obj, r); err != nil {
-			h.logServiceError(ctx, w, "error of PreCreate", err)
+			h.logServiceError(w, r, "error of PreCreate", err)
 			return
 		}
 	}
 	if id != "" && route.PreUpdate != nil {
 		if err := route.PreUpdate(obj, r); err != nil {
-			h.logServiceError(ctx, w, "error of PreUpdate", err)
+			h.logServiceError(w, r, "error of PreUpdate", err)
 			return
 		}
 	}
@@ -104,30 +92,15 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		switch {
 		case errors.As(err, &validErr):
 			// the error of the registry names the internal fields and relations, and is logged by it
-			message := "invalid object"
-			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-				Ok:      true,
-				Code:    jsonresp.CodeValidationFailed,
-				Message: &message,
-				Data:    validErr.Violations,
-			})
+			h.writeProblem(w, r, jsonresp.CodeValidationFailed, "The record has invalid fields, see errors.", validErr.Violations)
 		case errors.As(err, &uniqErr):
-			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeUniqueViolation,
-			})
+			h.writeProblem(w, r, jsonresp.CodeUniqueViolation, "", nil)
 		case errors.Is(err, gocrud.ErrForeignKeyViolation):
-			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeForeignKeyViolation,
-			})
+			h.writeProblem(w, r, jsonresp.CodeForeignKeyViolation, "", nil)
 		case errors.Is(err, gocrud.ErrVersionConflict):
-			jsonresp.Write(w, http.StatusConflict, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeVersionConflict,
-			})
+			h.writeProblem(w, r, jsonresp.CodeVersionConflict, "", nil)
 		default:
-			writeServiceError(w)
+			h.writeServiceError(w, r)
 		}
 		return
 	}

@@ -41,7 +41,7 @@ func TestServe_UnsupportedMethod(t *testing.T) {
 
 	testHandler.Serve(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	if w.Code != http.StatusMethodNotAllowed || w.Header().Get("Allow") != "OPTIONS, GET, PUT, DELETE" {
+		t.Errorf("PATCH returned %d with Allow %q, want 405 with the methods of a record", w.Code, w.Header().Get("Allow"))
 	}
 }

@@ -293,7 +293,7 @@ func TestAPI_Create_PasswordTooLong(t *testing.T) {
 	_, h := passStructService()
 
 	code, resp := serveJSON(t, h, http.MethodPut, "/passstruct/", 0, map[string]string{"Name": "alice", "Key": "k1", "Password": strings.Repeat("x", 73)})
-	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{"Password": "max"}) {
+	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, map[string]string{"Password": "max"}) {
 		t.Fatalf("PUT with a password that is too long returned %d %+v, want 400 with a max violation", code, resp)
 	}
 }

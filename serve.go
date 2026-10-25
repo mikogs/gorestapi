@@ -5,20 +5,35 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mikogs/gorestapi/pkg/jsonresp"
 	"github.com/mikogs/gorestapi/pkg/urlpath"
 )
 
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
-	h.options.CORS.WriteHeaders(w)
-
+	start := time.Now()
+	route := h.httpRoute(r)
+	ctx := context.WithValue(r.Context(), requestIDKey{}, requestID(w, r.Header))
+	ctx, span := h.telemetry.startSpan(ctx, r, route)
 	// the queries are cancelled after the timeout, also when the client does not close the connection
 	if timeout := orDefault(h.options.Timeout, DefaultTimeout); timeout > 0 {
-		ctx, cancel := context.WithTimeout(r.Context(), timeout)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
-		r = r.WithContext(ctx)
 	}
+	r = r.WithContext(ctx)
+
+	recorder := &responseRecorder{ResponseWriter: w}
+	w = recorder
+	defer func() {
+		h.telemetry.endSpan(ctx, span, r, route, recorder.statusOrOK(), start)
+		if h.options.AccessLog {
+			h.logAccess(r, recorder, start)
+		}
+	}()
+
+	h.options.CORS.WriteHeaders(w)
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
@@ -28,7 +43,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	foundURLPath, foundRoute := h.findRoute(r)
 
 	if foundURLPath == "" {
-		w.WriteHeader(http.StatusNotFound)
+		h.writeProblem(w, r, jsonresp.CodeNotFound, "There is no route for the URL.", nil)
 		return
 	}
 
@@ -37,77 +52,82 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	idPath := r.URL.Path[len("/"+foundURLPath+"/"):]
 	id, ok := urlpath.ID(idPath)
 	if !ok {
-		h.log().LogAttrs(r.Context(), slog.LevelDebug, "invalid ID in the URL", handlerAttr, slog.String("path", r.URL.Path))
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeURLPathID,
-		})
+		h.log().LogAttrs(ctx, slog.LevelDebug, "invalid ID in the URL", handlerAttr, slog.String("path", r.URL.Path))
+		h.writeProblem(w, r, jsonresp.CodeURLPathID, "", nil)
 		return
 	}
 
 	// create and update
 	if r.Method == http.MethodPut {
 		if id == "" && foundRoute.Flags&DisableCreate > 0 {
-			jsonresp.Write(w, http.StatusMethodNotAllowed, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeNotAllowed,
-			})
+			h.writeNotAllowed(w, r, foundRoute, id)
 			return
 		}
 		if id != "" && foundRoute.Flags&DisableUpdate > 0 {
-			jsonresp.Write(w, http.StatusMethodNotAllowed, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeNotAllowed,
-			})
+			h.writeNotAllowed(w, r, foundRoute, id)
 			return
 		}
-		h.handleAPICreateUpdate(r.Context(), w, r, key, foundRoute, id)
+		h.handleAPICreateUpdate(ctx, w, r, key, foundRoute, id)
 		return
 	}
 
 	// delete
 	if r.Method == http.MethodDelete && id != "" {
 		if foundRoute.Flags&DisableDelete > 0 {
-			jsonresp.Write(w, http.StatusMethodNotAllowed, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeNotAllowed,
-			})
+			h.writeNotAllowed(w, r, foundRoute, id)
 			return
 		}
-		h.handleAPIDelete(r.Context(), w, r, key, foundRoute, id)
+		h.handleAPIDelete(ctx, w, r, key, foundRoute, id)
 		return
 	}
 
 	// read
 	if r.Method == http.MethodGet && id != "" {
 		if foundRoute.Flags&DisableRead > 0 {
-			jsonresp.Write(w, http.StatusMethodNotAllowed, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeNotAllowed,
-			})
+			h.writeNotAllowed(w, r, foundRoute, id)
 			return
 		}
-		h.handleAPIRead(r.Context(), w, r, key, foundRoute, id)
+		h.handleAPIRead(ctx, w, r, key, foundRoute, id)
 		return
 	}
 
 	// list
 	if r.Method == http.MethodGet && id == "" {
 		if foundRoute.Flags&DisableList > 0 {
-			jsonresp.Write(w, http.StatusMethodNotAllowed, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeNotAllowed,
-			})
+			h.writeNotAllowed(w, r, foundRoute, id)
 			return
 		}
-		h.handleAPIList(r.Context(), w, r, key, foundRoute)
+		h.handleAPIList(ctx, w, r, key, foundRoute)
 		return
 	}
 
-	jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-		Ok:   true,
-		Code: jsonresp.CodeBadRequest,
-	})
+	h.writeNotAllowed(w, r, foundRoute, id)
+}
+
+// writeNotAllowed writes the problem of a method that the route does not allow for the URL, with the methods that it
+// allows in the Allow header, as HTTP requires.
+func (h *Handler) writeNotAllowed(w http.ResponseWriter, r *http.Request, route Route, id string) {
+	methods := []string{http.MethodOptions}
+	if id == "" {
+		if route.Flags&DisableList == 0 {
+			methods = append(methods, http.MethodGet)
+		}
+		if route.Flags&DisableCreate == 0 {
+			methods = append(methods, http.MethodPut)
+		}
+	} else {
+		if route.Flags&DisableRead == 0 {
+			methods = append(methods, http.MethodGet)
+		}
+		if route.Flags&DisableUpdate == 0 {
+			methods = append(methods, http.MethodPut)
+		}
+		if route.Flags&DisableDelete == 0 {
+			methods = append(methods, http.MethodDelete)
+		}
+	}
+	w.Header().Set("Allow", strings.Join(methods, ", "))
+	h.writeProblem(w, r, CodeNotAllowed, "", nil)
 }
 
 // RoutePath returns the path of the route of r, a key of Options.Routes, e.g. "notes" for /notes/42, or an empty

@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mikogs/gocrud"
 	"github.com/mikogs/gocrud/pkg/registry"
-	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 type ApiTicket struct {
@@ -46,7 +45,7 @@ func ticketsHandler(t *testing.T, route Route) *Handler {
 	})
 }
 
-func serveTicket(t *testing.T, h *Handler, method string, path string, body any) (int, jsonresp.Response) {
+func serveTicket(t *testing.T, h *Handler, method string, path string, body any) (int, testResponse) {
 	t.Helper()
 
 	data, _ := json.Marshal(body)
@@ -55,7 +54,7 @@ func serveTicket(t *testing.T, h *Handler, method string, path string, body any)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 
-	var resp jsonresp.Response
+	var resp testResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal response %q: %v", w.Body.String(), err)
 	}
@@ -131,7 +130,7 @@ func TestServe_UUIDList(t *testing.T) {
 	}
 
 	code, resp = serveTicket(t, h, http.MethodGet, "/tickets/?filter_val_ID=42", nil)
-	if code != http.StatusBadRequest || resp.Data.(map[string]any)["ID"] != gocrud.ViolationType {
+	if code != http.StatusBadRequest || resp.Errors["ID"] != gocrud.ViolationType {
 		t.Fatalf("a list with an invalid id returned %d %+v, want 400 with a type violation", code, resp)
 	}
 }

@@ -9,9 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/mikogs/gocrud/pkg/registry"
 	"github.com/mikogs/gorestapi/pkg/cors"
-	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 const (
@@ -113,10 +115,21 @@ type Route struct {
 
 type Options struct {
 	CORS cors.CORS
+	// ProblemTypeBaseURL is the beginning of the type URIs of the problems of the error responses, e.g.
+	// https://api.example.com/problems/, followed by the code of the problem, e.g. unique-violation. When it is empty,
+	// the type of all the problems is about:blank, and their code tells them apart.
+	ProblemTypeBaseURL string
 	// Logger logs the errors of the hooks of the routes, and the problems of the routes, or slog.Default() when it is
 	// nil. The errors of the queries are logged by the registry, see registry.CRUD.WithLogger.
 	Logger *slog.Logger
-	Routes map[string]Route
+	// TracerProvider and MeterProvider are the providers of OpenTelemetry of the spans and the metrics of the requests,
+	// or the global ones, of otel.SetTracerProvider and otel.SetMeterProvider, when they are nil.
+	TracerProvider trace.TracerProvider
+	MeterProvider  metric.MeterProvider
+	// AccessLog logs every request with Logger, at the info level: its method, route, path, the status and the size of
+	// its response, and its duration.
+	AccessLog bool
+	Routes    map[string]Route
 	// UserIDFunc is called on every create and update request to obtain the
 	// current user's ID, which is passed to the registry as ModifiedBy: a
 	// uint64, or a string for CreatedBy and ModifiedBy fields of type string.
@@ -143,8 +156,9 @@ func orDefault[T int | time.Duration](value T, def T) T {
 }
 
 type Handler struct {
-	options Options
-	reg     *registry.CRUD
+	options   Options
+	reg       Registry
+	telemetry *telemetry
 
 	// responseFieldsCache caches the fields of the responses of List, see responseFields.
 	responseFieldsCache sync.Map
@@ -152,10 +166,29 @@ type Handler struct {
 	refusedPaths sync.Map
 }
 
-func New(reg *registry.CRUD, options Options) *Handler {
+// Registry is what the handler needs of a registry of structs. *registry.CRUD of gocrud implements it, and so can a
+// layer of the application in front of it, e.g. with the rules of its domain, or a fake in tests. The handler maps the
+// errors of the registry to its responses, so an implementation returns the same errors, e.g. a
+// *registry.ModelValidationError for an invalid record, or an error that matches gocrud.ErrNotFound.
+type Registry interface {
+	New(key string) any
+	ID(obj any) any
+	Read(ctx context.Context, key string, id any, constructor func() any) (any, error)
+	List(ctx context.Context, key string, options registry.ListOptions) ([]any, error)
+	NextCursor(obj any, order string, orderDirection string) (string, error)
+	Save(ctx context.Context, obj any, userID any) error
+	Delete(ctx context.Context, key string, id any) error
+	PasswordFieldNames(key string) []string
+	RelatedType(obj any, field string) (reflect.Type, bool)
+}
+
+var _ Registry = (*registry.CRUD)(nil)
+
+func New(reg Registry, options Options) *Handler {
 	return &Handler{
-		options: options,
-		reg:     reg,
+		options:   options,
+		reg:       reg,
+		telemetry: newTelemetry(options.TracerProvider, options.MeterProvider),
 	}
 }
 
@@ -169,16 +202,13 @@ func (h *Handler) log() *slog.Logger {
 	return slog.Default()
 }
 
-// writeServiceError writes the response of an error of the registry, which logs its errors itself.
-func writeServiceError(w http.ResponseWriter) {
-	jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-		Ok:   true,
-		Code: CodeServiceError,
-	})
+// writeServiceError writes the problem of an error of the registry, which logs its errors itself.
+func (h *Handler) writeServiceError(w http.ResponseWriter, r *http.Request) {
+	h.writeProblem(w, r, CodeServiceError, "", nil)
 }
 
-// logServiceError logs err, e.g. of a hook of a route, and writes the response of an error of the server.
-func (h *Handler) logServiceError(ctx context.Context, w http.ResponseWriter, msg string, err error) {
-	h.log().LogAttrs(ctx, slog.LevelError, msg, handlerAttr, slog.String("err", err.Error()))
-	writeServiceError(w)
+// logServiceError logs err, e.g. of a hook of a route, and writes the problem of an error of the server.
+func (h *Handler) logServiceError(w http.ResponseWriter, r *http.Request, msg string, err error) {
+	h.log().LogAttrs(r.Context(), slog.LevelError, msg, handlerAttr, slog.String("err", err.Error()))
+	h.writeServiceError(w, r)
 }

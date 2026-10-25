@@ -48,13 +48,8 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 	order := params.Get("order")
 	orderDirection := params.Get("order_direction")
 	if order != "" && !isFilterAllowed(allowed, order) && !isFilterAllowed(responseFields, order) {
-		message := "invalid order"
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:      true,
-			Code:    jsonresp.CodeValidationFailed,
-			Message: &message,
-			Data:    map[string]string{order: gocrud.ViolationType},
-		})
+		h.writeProblem(w, r, jsonresp.CodeValidationFailed, "The order is not a field that can be used, see errors.",
+			map[string]string{order: gocrud.ViolationType})
 		return
 	}
 
@@ -81,13 +76,7 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	if violations := h.checkFilters(route, filters); len(violations) > 0 {
-		message := "invalid filters"
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:      true,
-			Code:    jsonresp.CodeValidationFailed,
-			Message: &message,
-			Data:    violations,
-		})
+		h.writeProblem(w, r, jsonresp.CodeValidationFailed, "The filters have invalid values, see errors.", violations)
 		return
 	}
 
@@ -110,23 +99,18 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 		var validErr *registry.FilterValidationError
 		if errors.As(err, &validErr) {
 			// the error of the registry names the internal fields and relations, and is logged by it
-			message := "invalid filters"
+			message := "The filters have invalid values, see errors."
 			switch {
 			case errors.Is(err, gocrud.ErrInvalidOrder):
-				message = "invalid order"
+				message = "The order is not a field that can be used, see errors."
 			case errors.Is(err, gocrud.ErrCursor):
-				message = "invalid cursor"
+				message = "The cursor cannot be used for the order, see errors."
 			}
-			jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-				Ok:      true,
-				Code:    jsonresp.CodeValidationFailed,
-				Message: &message,
-				Data:    validErr.Violations,
-			})
+			h.writeProblem(w, r, jsonresp.CodeValidationFailed, message, validErr.Violations)
 			return
 		}
 
-		writeServiceError(w)
+		h.writeServiceError(w, r)
 		return
 	}
 
@@ -148,7 +132,7 @@ func (h *Handler) handleAPIList(ctx context.Context, w http.ResponseWriter, r *h
 	for i, obj := range objs {
 		if route.PostListItem != nil {
 			if err := route.PostListItem(obj, r); err != nil {
-				h.logServiceError(ctx, w, "error of PostListItem", err)
+				h.logServiceError(w, r, "error of PostListItem", err)
 				return
 			}
 		}

@@ -49,7 +49,7 @@ func TestAPI_List_HiddenFields(t *testing.T) {
 
 	for _, field := range []string{"Secret", "Password", "Unknown"} {
 		code, resp := serveJSON(t, h, http.MethodGet, "/hidden/?order="+field, 0, nil)
-		if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{field: "type"}) {
+		if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, map[string]string{field: "type"}) {
 			t.Fatalf("a list ordered by %s returned %d %+v, want 400 with a type violation", field, code, resp)
 		}
 	}
@@ -63,7 +63,7 @@ func TestAPI_List_ListedHiddenFields(t *testing.T) {
 	}
 
 	code, resp := serveJSON(t, h, http.MethodGet, "/hidden/?filter_val_Password=$2a$25&filter_op_Password=like", 0, nil)
-	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{"Password": gocrud.ViolationPassword}) {
+	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, map[string]string{"Password": gocrud.ViolationPassword}) {
 		t.Fatalf("a filter on a listed password field returned %d %+v, want 400 with a password violation", code, resp)
 	}
 }

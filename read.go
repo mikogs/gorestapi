@@ -26,14 +26,11 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 			objs, listErr = nil, nil
 		}
 		if listErr != nil {
-			writeServiceError(w)
+			h.writeServiceError(w, r)
 			return
 		}
 		if len(objs) == 0 {
-			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeNotFound,
-			})
+			h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 			return
 		}
 		obj = objs[0]
@@ -42,30 +39,24 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 		obj, err = h.reg.Read(ctx, key, id, route.ReadConstructor)
 		if err != nil {
 			if isNotFound(err) {
-				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-					Ok:   true,
-					Code: jsonresp.CodeNotFound,
-				})
+				h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 				return
 			}
-			writeServiceError(w)
+			h.writeServiceError(w, r)
 			return
 		}
 	}
 
 	if route.AllowRead != nil {
 		if err := route.AllowRead(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeForbidden,
-			})
+			h.writeProblem(w, r, CodeForbidden, "", nil)
 			return
 		}
 	}
 
 	if route.PostRead != nil {
 		if err := route.PostRead(obj, r); err != nil {
-			h.logServiceError(ctx, w, "error of PostRead", err)
+			h.logServiceError(w, r, "error of PostRead", err)
 			return
 		}
 	}

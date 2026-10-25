@@ -58,7 +58,18 @@ func apiHandler(t *testing.T) *Handler {
 	})
 }
 
-func serveJSON(t *testing.T, h *Handler, method string, path string, userID uint64, body any) (int, jsonresp.Response) {
+// testResponse has the fields of both the responses and the problems of the errors, to check either of them.
+type testResponse struct {
+	jsonresp.Response
+	Type     string
+	Title    string
+	Status   int
+	Detail   string
+	Instance string
+	Errors   map[string]string
+}
+
+func serveJSON(t *testing.T, h *Handler, method string, path string, userID uint64, body any) (int, testResponse) {
 	t.Helper()
 
 	var reader *bytes.Reader
@@ -74,7 +85,7 @@ func serveJSON(t *testing.T, h *Handler, method string, path string, userID uint
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 
-	var resp jsonresp.Response
+	var resp testResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal response %q: %v", w.Body.String(), err)
 	}
@@ -101,11 +112,11 @@ func TestServe_ValidationViolations(t *testing.T) {
 	h := apiHandler(t)
 
 	code, resp := serveJSON(t, h, http.MethodPut, "/orders/", 1, map[string]any{"customer_id": 1, "status": "lost"})
-	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || resp.Message == nil || *resp.Message != "invalid object" {
-		t.Fatalf("got %d %+v, want %d %s with the message invalid object", code, resp, http.StatusBadRequest, jsonresp.CodeValidationFailed)
+	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || resp.Detail != "The record has invalid fields, see errors." {
+		t.Fatalf("got %d %+v, want %d %s with the detail of an invalid record", code, resp, http.StatusBadRequest, jsonresp.CodeValidationFailed)
 	}
-	if !reflect.DeepEqual(resp.Data, map[string]any{"Status": "oneof"}) {
-		t.Fatalf("got data %v, want the violations {Status: oneof}", resp.Data)
+	if !reflect.DeepEqual(resp.Errors, map[string]string{"Status": "oneof"}) {
+		t.Fatalf("got errors %v, want the violations {Status: oneof}", resp.Errors)
 	}
 }
 
@@ -114,14 +125,14 @@ func TestServe_ValidationMessages(t *testing.T) {
 	h.options.Routes["orders"] = Route{AllowedFilters: []string{"Status", "Customer.Name", "Status.Name"}}
 
 	for path, want := range map[string]string{
-		"/orders/?filter_val_Status=lost":                   "invalid filters",
-		"/orders/?order=Status.Name":                        "invalid order",
-		"/orders/?order=Unknown":                            "invalid order",
-		"/orders/?filter_val_Status=new&filter_op_Status=x": "invalid filters",
+		"/orders/?filter_val_Status=lost":                   "The filters have invalid values, see errors.",
+		"/orders/?order=Status.Name":                        "The order is not a field that can be used, see errors.",
+		"/orders/?order=Unknown":                            "The order is not a field that can be used, see errors.",
+		"/orders/?filter_val_Status=new&filter_op_Status=x": "The filters have invalid values, see errors.",
 	} {
 		code, resp := serveJSON(t, h, http.MethodGet, path, 0, nil)
-		if code != http.StatusBadRequest || resp.Message == nil || *resp.Message != want {
-			t.Fatalf("GET %s returned %d %+v, want 400 with the message %q", path, code, resp, want)
+		if code != http.StatusBadRequest || resp.Detail != want {
+			t.Fatalf("GET %s returned %d %+v, want 400 with the detail %q", path, code, resp, want)
 		}
 	}
 }
@@ -223,8 +234,8 @@ func TestServe_ListFilters(t *testing.T) {
 	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed {
 		t.Fatalf("a list with an invalid value returned %d %+v, want %d %s", code, resp, http.StatusBadRequest, jsonresp.CodeValidationFailed)
 	}
-	if !reflect.DeepEqual(resp.Data, map[string]any{"Status": "oneof"}) {
-		t.Fatalf("a list with an invalid value returned data %v, want the violations {Status: oneof}", resp.Data)
+	if !reflect.DeepEqual(resp.Errors, map[string]string{"Status": "oneof"}) {
+		t.Fatalf("a list with an invalid value returned errors %v, want the violations {Status: oneof}", resp.Errors)
 	}
 }
 
@@ -301,7 +312,7 @@ func TestServe_FilterPaths(t *testing.T) {
 		t.Fatalf("GET %s returned orders %v, want all, as a path is not allowed unless it is listed", byPath, got)
 	}
 	sorted := "/orders/?order=Customer.Name&order_direction=desc"
-	if code, resp := serveJSON(t, h, http.MethodGet, sorted, 0, nil); code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, map[string]any{"Customer.Name": "type"}) {
+	if code, resp := serveJSON(t, h, http.MethodGet, sorted, 0, nil); code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, map[string]string{"Customer.Name": "type"}) {
 		t.Fatalf("GET %s returned %d %+v, want 400, as the path is not allowed unless it is listed", sorted, code, resp)
 	}
 
@@ -324,7 +335,7 @@ func TestServe_InvalidOrder(t *testing.T) {
 	h := apiHandler(t)
 
 	code, resp := serveJSON(t, h, http.MethodGet, "/orders/?order=Unknown&order_direction=asc", 0, nil)
-	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || !reflect.DeepEqual(resp.Data, map[string]any{"Unknown": "type"}) {
+	if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || !reflect.DeepEqual(resp.Errors, map[string]string{"Unknown": "type"}) {
 		t.Fatalf("a list ordered by an unknown field returned %d %+v, want 400 with a type violation", code, resp)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gocrud/otelhook"
 	"github.com/mikogs/gocrud/pkg/registry"
 	"github.com/mikogs/gorestapi"
 	_ "modernc.org/sqlite"
@@ -61,10 +61,27 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
+	// the logs are JSON, with the IDs of the request, the trace and the span of each record of a request
+	logger := slog.New(gorestapi.LogHandler(slog.NewJSONHandler(os.Stderr, nil)))
+	slog.SetDefault(logger)
+
+	metrics, shutdownTelemetry, err := setupTelemetry(context.Background(), db)
+	if err != nil {
+		slog.Error("failed to set up telemetry", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = shutdownTelemetry(context.Background()) }()
+
+	queryHook, err := otelhook.New(otelhook.Options{Dialect: gocrud.DialectSQLite})
+	if err != nil {
+		slog.Error("failed to create the query hook", "error", err)
+		os.Exit(1)
+	}
+
 	reg := registry.New(map[string]func() any{
 		"users": func() any { return &User{} },
 		"notes": func() any { return &Note{} },
-	}, db, gocrud.Options{Dialect: gocrud.DialectSQLite})
+	}, db, gocrud.Options{Dialect: gocrud.DialectSQLite, QueryHook: queryHook}).WithLogger(logger)
 
 	// Migrate creates the tables, and adds the columns of new fields to existing ones
 	if _, err := reg.Migrate(context.Background()); err != nil {
@@ -96,6 +113,8 @@ func main() {
 
 	handler := gorestapi.New(reg, gorestapi.Options{
 		UserIDFunc: userIDFromRequest,
+		Logger:     logger,
+		AccessLog:  true,
 		Routes: map[string]gorestapi.Route{
 			// The audit fields (CreatedAt, CreatedBy, ModifiedAt, ModifiedBy) are set by gocrud,
 			// which ignores the values sent by clients.
@@ -130,9 +149,22 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintln(w, "ok")
+	mux.HandleFunc("/healthz", gorestapi.Liveness)
+	mux.Handle("/readyz", handler.Readiness(db.PingContext))
+	mux.Handle("/metrics", metrics)
+
+	spec, err := handler.OpenAPI(gorestapi.OpenAPIInfo{Title: "gorestapi PoC", Version: "1.0.0", Servers: []string{"/api"}})
+	if err != nil {
+		slog.Error("failed to generate the OpenAPI document", "error", err)
+		os.Exit(1)
+	}
+	mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(spec)
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(swaggerUI))
 	})
 
 	// the timeouts keep slow clients from holding connections open, e.g. by sending the headers byte by byte
@@ -166,3 +198,19 @@ func main() {
 		slog.Error("shutdown error", "error", err)
 	}
 }
+
+// swaggerUI is the page of Swagger UI of the OpenAPI document, with its scripts from a CDN.
+const swaggerUI = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>gorestapi PoC</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.33.1/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.33.1/swagger-ui-bundle.js"></script>
+  <script>SwaggerUIBundle({url: "/openapi.json", dom_id: "#swagger-ui"});</script>
+</body>
+</html>
+`

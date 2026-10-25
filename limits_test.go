@@ -62,17 +62,17 @@ func inValues(n int) string {
 	return "filter_op_ID=in&filter_val_ID=" + strings.Join(values, ",")
 }
 
-func fatalIfNotBadRequest(t *testing.T, h *Handler, path string, want map[string]any) {
+func fatalIfNotBadRequest(t *testing.T, h *Handler, path string, want map[string]string) {
 	t.Helper()
 
 	code, resp := serveJSON(t, h, http.MethodGet, path, 0, nil)
-	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Data, want) {
+	if code != http.StatusBadRequest || !reflect.DeepEqual(resp.Errors, want) {
 		t.Fatalf("GET %s returned %d %+v, want 400 with %v", path, code, resp, want)
 	}
 }
 
 func TestAPI_List_MatchFilter(t *testing.T) {
-	fatalIfNotBadRequest(t, limitHandler(t, Route{}, Options{}), "/limits/?filter_op_Name=match&filter_val_Name=^a", map[string]any{"Name": "type"})
+	fatalIfNotBadRequest(t, limitHandler(t, Route{}, Options{}), "/limits/?filter_op_Name=match&filter_val_Name=^a", map[string]string{"Name": "type"})
 
 	h := limitHandler(t, Route{Flags: EnableMatchFilters}, Options{})
 	if got := listIDs(t, h, "/limits/?filter_op_Name=match&filter_val_Name=^a"); !reflect.DeepEqual(got, []uint64{1}) {
@@ -82,13 +82,13 @@ func TestAPI_List_MatchFilter(t *testing.T) {
 
 func TestAPI_List_MaxFilters(t *testing.T) {
 	h := limitHandler(t, Route{}, Options{})
-	fatalIfNotBadRequest(t, h, "/limits/?"+groupFilters(DefaultMaxFilters+1), map[string]any{"filters": "max"})
+	fatalIfNotBadRequest(t, h, "/limits/?"+groupFilters(DefaultMaxFilters+1), map[string]string{"filters": "max"})
 	if got := listIDs(t, h, "/limits/?"+groupFilters(DefaultMaxFilters)); !reflect.DeepEqual(got, []uint64{1}) {
 		t.Fatalf("%d filters returned %v, want [1]", DefaultMaxFilters, got)
 	}
 
 	h = limitHandler(t, Route{}, Options{MaxFilters: 2})
-	fatalIfNotBadRequest(t, h, "/limits/?"+groupFilters(3), map[string]any{"filters": "max"})
+	fatalIfNotBadRequest(t, h, "/limits/?"+groupFilters(3), map[string]string{"filters": "max"})
 
 	h = limitHandler(t, Route{}, Options{MaxFilters: -1})
 	if got := listIDs(t, h, "/limits/?"+groupFilters(DefaultMaxFilters+5)); !reflect.DeepEqual(got, []uint64{1}) {
@@ -98,13 +98,13 @@ func TestAPI_List_MaxFilters(t *testing.T) {
 
 func TestAPI_List_MaxInValues(t *testing.T) {
 	h := limitHandler(t, Route{}, Options{})
-	fatalIfNotBadRequest(t, h, "/limits/?"+inValues(DefaultMaxInValues+1), map[string]any{"ID": "max"})
+	fatalIfNotBadRequest(t, h, "/limits/?"+inValues(DefaultMaxInValues+1), map[string]string{"ID": "max"})
 	if got := listIDs(t, h, "/limits/?"+inValues(DefaultMaxInValues)); !reflect.DeepEqual(got, []uint64{1}) {
 		t.Fatalf("%d values of in returned %v, want [1]", DefaultMaxInValues, got)
 	}
 
 	h = limitHandler(t, Route{}, Options{MaxInValues: 3})
-	fatalIfNotBadRequest(t, h, "/limits/?"+inValues(4), map[string]any{"ID": "max"})
+	fatalIfNotBadRequest(t, h, "/limits/?"+inValues(4), map[string]string{"ID": "max"})
 
 	h = limitHandler(t, Route{}, Options{MaxInValues: -1})
 	if got := listIDs(t, h, "/limits/?"+inValues(DefaultMaxInValues+50)); !reflect.DeepEqual(got, []uint64{1}) {

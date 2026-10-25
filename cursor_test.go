@@ -79,7 +79,7 @@ func TestServe_ListAfter(t *testing.T) {
 		"with offset":   "/posts/?limit=3&offset=3&order=Score&order_direction=desc&after=" + url.QueryEscape(after),
 	} {
 		code, resp := serveJSON(t, h, http.MethodGet, path, 0, nil)
-		if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || *resp.Message != "invalid cursor" {
+		if code != http.StatusBadRequest || resp.Code != jsonresp.CodeValidationFailed || resp.Detail != "The cursor cannot be used for the order, see errors." {
 			t.Fatalf("a list with %s returned %d %+v, want 400 invalid cursor", name, code, resp)
 		}
 	}
