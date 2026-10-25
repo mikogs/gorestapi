@@ -68,11 +68,11 @@ type Options struct {
 | Field | Type | Description |
 |---|---|---|
 | `CORS` | `cors.CORS` | CORS headers written on every response. Zero value emits no CORS headers. |
-| `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Only the paths in the map are served, other paths return `404`. A route with the zero value has all operations enabled and all filters allowed, e.g. `"notes": {}`. |
+| `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Only the paths in the map are served, other paths are the `404` problem `NOT_FOUND`. A route with the zero value has all operations enabled and all filters allowed, e.g. `"notes": {}`. |
 | `UserIDFunc` | `func(*http.Request) any` | Called on every create and update request to obtain the current user's ID, passed to the registry as `ModifiedBy`: a `uint64`, or a `string` for `CreatedBy` and `ModifiedBy` fields of type `string`, e.g. the subject of a JWT. When `nil`, or when it returns `nil`, `ModifiedBy` is `0` or `""`. When the struct has the `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` fields, gocrud sets them from this ID and the time of the request, ignores the values sent in the request body, and never changes `CreatedAt` and `CreatedBy` on an update. |
-| `MaxFilters` | `int` | The largest number of `filter_val_*` parameters of a list request, otherwise the response is `400` with `{"filters": "max"}`. `0` is `DefaultMaxFilters` (20), and a negative value is no limit. |
-| `MaxInValues` | `int` | The largest number of the values of an `in` filter, otherwise the response is `400` with e.g. `{"Status": "max"}`. `0` is `DefaultMaxInValues` (100), and a negative value is no limit. |
-| `Timeout` | `time.Duration` | The longest time of a request: its queries are cancelled after it, also in the database, and the response is `500 SERVICE_ERROR`. `0` is `DefaultTimeout` (30 seconds), and a negative value is no timeout. |
+| `MaxFilters` | `int` | The largest number of `filter_val_*` parameters of a list request, otherwise the response is the `400` problem `VALIDATION_FAILED` with `{"filters": "max"}` in `errors`. `0` is `DefaultMaxFilters` (20), and a negative value is no limit. |
+| `MaxInValues` | `int` | The largest number of the values of an `in` filter, otherwise the response is the `400` problem `VALIDATION_FAILED` with e.g. `{"Status": "max"}` in `errors`. `0` is `DefaultMaxInValues` (100), and a negative value is no limit. |
+| `Timeout` | `time.Duration` | The longest time of a request: its queries are cancelled after it, also in the database, and the response is the `500` problem `SERVICE_ERROR`. `0` is `DefaultTimeout` (30 seconds), and a negative value is no timeout. |
 | `ProblemTypeBaseURL` | `string` | The beginning of the type URIs of the problems of the errors, e.g. `https://api.example.com/problems/`. When it is empty, the type is `about:blank`, see [Errors](#errors). |
 | `Logger` | `*slog.Logger` | The logger of the handler, `slog.Default()` when `nil`, see [Logging](#logging). |
 | `AccessLog` | `bool` | Logs every request with `Logger`, at the info level, see [Logging](#logging). |
@@ -127,17 +127,17 @@ Routes: map[string]gorestapi.Route{
 
 | Constant | Effect |
 |---|---|
-| `DisableCreate` | `PUT /{path}/` (create) — responds `405` |
-| `DisableUpdate` | `PUT /{path}/{id}` (update) — responds `405` |
-| `DisableDelete` | `DELETE /{path}/{id}` — responds `405` |
-| `DisableRead` | `GET /{path}/{id}` — responds `405` |
-| `DisableList` | `GET /{path}/` — responds `405` |
+| `DisableCreate` | `PUT /{path}/` (create) — responds with the `405` problem `NOT_ALLOWED`, and the allowed methods in the `Allow` header |
+| `DisableUpdate` | `PUT /{path}/{id}` (update) — responds with the `405` problem `NOT_ALLOWED`, and the allowed methods in the `Allow` header |
+| `DisableDelete` | `DELETE /{path}/{id}` — responds with the `405` problem `NOT_ALLOWED`, and the allowed methods in the `Allow` header |
+| `DisableRead` | `GET /{path}/{id}` — responds with the `405` problem `NOT_ALLOWED`, and the allowed methods in the `Allow` header |
+| `DisableList` | `GET /{path}/` — responds with the `405` problem `NOT_ALLOWED`, and the allowed methods in the `Allow` header |
 | `DisableFilters` | All `filter_val_*` / `filter_op_*` query parameters are ignored |
-| `EnableMatchFilters` | Allows the `match` operator, a regular expression from the client, which can take the database a long time. Without the flag, `match` is a `400` response with e.g. `{"Name": "type"}` |
+| `EnableMatchFilters` | Allows the `match` operator, a regular expression from the client, which can take the database a long time. Without the flag, `match` is the `400` problem `VALIDATION_FAILED` with e.g. `{"Name": "type"}` in `errors` |
 
 **AllowedFilters**
 
-`AllowedFilters` is a whitelist of field names that clients may pass as filters. When it is empty, the fields that List returns are allowed (unless `DisableFilters` is set): not the [password fields](#password-fields), and not the fields with a `json:"-"` tag. A client cannot filter by the values that it does not get, as a filter, e.g. with `like`, would reveal them. Fields that are not allowed are silently dropped from the request, also in [filter groups](#list--get-path), e.g. `filter_val_Status~q` is allowed when `Status` is. To allow a field that is not returned, list it. Password fields cannot be used in filters even when they are listed: the response is `400` with `{"Password": "password"}`.
+`AllowedFilters` is a whitelist of field names that clients may pass as filters. When it is empty, the fields that List returns are allowed (unless `DisableFilters` is set): not the [password fields](#password-fields), and not the fields with a `json:"-"` tag. A client cannot filter by the values that it does not get, as a filter, e.g. with `like`, would reveal them. Fields that are not allowed are silently dropped from the request, also in [filter groups](#list--get-path), e.g. `filter_val_Status~q` is allowed when `Status` is. To allow a field that is not returned, list it. Password fields cannot be used in filters even when they are listed: the response is the `400` problem `VALIDATION_FAILED` with `{"Password": "password"}` in `errors`.
 
 `order` can be a field that List returns, or one of `AllowedFilters`. Another `order` is a `400 VALIDATION_FAILED` problem with `{"<order>": "type"}` in `errors`, the same as for a field that does not exist, so that clients cannot find out which fields are not returned.
 
@@ -156,7 +156,7 @@ A path must not let clients find records by values that they cannot read, e.g. b
 * returns the next field of the path, or lists it in its own `AllowedFilters`, e.g. `Customer.Email` needs a route of customers that returns `Email`, or lists it, and
 * shows the same records to every client: it has no `FilterList`, `FilterRead` and `AllowRead`, which a path cannot apply to the related records, and it does not have the flags `DisableList` or `DisableFilters`.
 
-A listed path that cannot be used is treated like a field that is not allowed: its filters are ignored, and an `order` by it is a `400` response. The handler logs a warning with the reason once, e.g. `reason="route customers has FilterList"`. For a path to records that are only for some clients, e.g. the owner of a note, filter by the key field instead, e.g. `UserID`, or add a route of the related struct for the records that every client can read.
+A listed path that cannot be used is treated like a field that is not allowed: its filters are ignored, and an `order` by it is the `400` problem `VALIDATION_FAILED`. The handler logs a warning with the reason once, e.g. `reason="route customers has FilterList"`. For a path to records that are only for some clients, e.g. the owner of a note, filter by the key field instead, e.g. `UserID`, or add a route of the related struct for the records that every client can read.
 
 ```go
 Routes: map[string]gorestapi.Route{
@@ -166,7 +166,7 @@ Routes: map[string]gorestapi.Route{
 
 **Authorization hooks — Allow\***
 
-Each `Allow*` hook is called with the loaded object and the request. Return a non-nil error to reject the operation with `403 Forbidden`.
+Each `Allow*` hook is called with the loaded object and the request. Return a non-nil error to reject the operation with the `403` problem `FORBIDDEN`. The error is not sent to the client, so it can name the reason for the logs of your application.
 
 | Field | When called | Object passed |
 |---|---|---|
@@ -229,7 +229,7 @@ Routes: map[string]gorestapi.Route{
 
 Called with the fully-prepared object just before it is written to the database. The request body has already been applied, and the ID is the one from the URL for an update, and `0` for a create. Use these to stamp server-controlled fields that should not be settable by the client.
 
-Return a non-nil error to abort the operation with `500 Internal Server Error`.
+Return a non-nil error to abort the operation with the `500` problem `SERVICE_ERROR`. The error is logged, see [Logging](#logging), and not sent to the client.
 
 ```go
 Routes: map[string]gorestapi.Route{
@@ -251,7 +251,7 @@ Called on loaded objects just before they are serialised to JSON. Use these to s
 | `PostRead` | A single-record read (`GET /{path}/{id}`) |
 | `PostListItem` | Each item in a list response (`GET /{path}/`) |
 
-Return a non-nil error to abort with `500 Internal Server Error`. For `PostListItem` an error aborts the entire list response.
+Return a non-nil error to abort with the `500` problem `SERVICE_ERROR`, which is logged, and not sent to the client. For `PostListItem` an error aborts the entire list response.
 
 ```go
 Routes: map[string]gorestapi.Route{
@@ -451,7 +451,7 @@ type User struct {
 }
 ```
 
-An update (`PUT /{path}/{id}`) keeps the stored password when the request has no password, or an empty one, e.g. `{"Email": "new@example.com"}` changes only the e-mail. A request with a password, e.g. `{"Password": "new secret"}`, changes it. The password is hashed with bcrypt, also when it looks like a hash. A password longer than 72 bytes, the most that bcrypt hashes, is a `400` response with `{"Password": "max"}`.
+An update (`PUT /{path}/{id}`) keeps the stored password when the request has no password, or an empty one, e.g. `{"Email": "new@example.com"}` changes only the e-mail. A request with a password, e.g. `{"Password": "new secret"}`, changes it. The password is hashed with bcrypt, also when it looks like a hash. A password longer than 72 bytes, the most that bcrypt hashes, is the `400` problem `VALIDATION_FAILED` with `{"Password": "max"}` in `errors`.
 
 ## Endpoints
 
@@ -466,8 +466,8 @@ Returns a paginated, filtered list of records.
 | `limit` | int | `10` | Maximum number of records to return |
 | `offset` | int | `0` | Number of records to skip |
 | `after` | string | — | The cursor of the next page, `meta.next` of the previous page, see below. It cannot be combined with `offset` |
-| `order` | string | — | Field name to sort by, of a field that List returns or one listed in `AllowedFilters`, or a path through belongs-to relations listed in `AllowedFilters`, e.g. `Customer.Name` |
-| `order_direction` | string | — | `asc` or `desc`, in any letter case |
+| `order` | string | `ID` | Field name to sort by, of a field that List returns or one listed in `AllowedFilters`, or a path through belongs-to relations listed in `AllowedFilters`, e.g. `Customer.Name`. The records with the same value are ordered by `ID`, in the same direction, so that the pages neither miss nor repeat them |
+| `order_direction` | string | `asc` | `asc` or `desc`, in any letter case |
 | `filter_val_{Field}` | string | — | Filter value for the named field |
 | `filter_op_{Field}` | string | `eq` | Filter operator for the named field: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `like`, `match` (PostgreSQL only, with the flag `EnableMatchFilters`), `bit` or `in` |
 
@@ -520,7 +520,7 @@ Returns a single record by ID.
 }
 ```
 
-**Response `404 Not Found`:** the problem `NOT_FOUND`, see [Errors](#errors).
+**Errors:** the `404` problem `NOT_FOUND`, also for an `id` that is not valid for the route, or a record of [FilterRead](#route) that the client cannot read, the `403` problem `FORBIDDEN` of `AllowRead`, and the `500` problem `SERVICE_ERROR`, e.g. of `PostRead`. See [Errors](#errors).
 
 ---
 
@@ -557,6 +557,8 @@ For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4
 }
 ```
 
+**Response `403 Forbidden`:** the problem `FORBIDDEN` of `AllowCreate`. **Response `400 Bad Request`:** also the problem `UNMARSHAL_REQUEST`, of a body that is not a JSON object of the record.
+
 **Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist, and `VERSION_CONFLICT` when the record has a [version field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#10-version) and the body has a version other than the stored one, as the record was changed since the client read it. A body without the version is saved with the version that was read, so only a client that sends the version it read is protected from overwriting another change.
 
 ---
@@ -570,6 +572,8 @@ Updates an existing record. The request body replaces the record's fields. Retur
 { "ok": true, "code": "SUCCESS", "data": { "id": 42 } }
 ```
 
+**Errors:** the same as of a create, `400`, `403` of `AllowUpdate`, `409` and `500`, and the `404` problem `NOT_FOUND`.
+
 ---
 
 ### Delete — `DELETE /{path}/{id}`
@@ -581,9 +585,7 @@ Deletes a record by ID.
 { "ok": true, "code": "SUCCESS" }
 ```
 
-**Response `404 Not Found`:** the problem `NOT_FOUND`, see [Errors](#errors).
-
-**Response `409 Conflict`**: `FOREIGN_KEY_VIOLATION` when other records reference the record with a foreign key that does not allow deleting it. Records referenced with `on_delete:cascade` are deleted along with it.
+**Errors:** the `404` problem `NOT_FOUND`, the `403` problem `FORBIDDEN` of `AllowDelete`, and the `409` problem `FOREIGN_KEY_VIOLATION` when other records reference the record with a foreign key that does not allow deleting it. Records referenced with `on_delete:cascade` are deleted along with it.
 
 ---
 
@@ -661,6 +663,19 @@ The URIs identify the problems, so keep them the same once clients use them. The
 | `VERSION_CONFLICT` | 409 | Version conflict | `version-conflict` | The record was changed since the client read it, see its version field |
 | `SERVICE_ERROR` | 500 | Service error | `service-error` | An error of the database, or of a `Pre*` or `Post*` hook, which is logged |
 | `SERVICE_UNAVAILABLE` | 503 | Service unavailable | `service-unavailable` | The check of a [readiness probe](#health-checks) failed |
+
+The codes are constants in Go, e.g. `jsonresp.CodeValidationFailed`, `jsonresp.CodeNotFound` and `gorestapi.CodeForbidden`, for clients and tests in Go. The handlers of your application, e.g. of a login, can respond with the same problems with `jsonresp.WriteProblem`:
+
+```go
+jsonresp.WriteProblem(w, &jsonresp.Problem{
+    Type:     "about:blank",
+    Title:    http.StatusText(http.StatusUnauthorized),
+    Status:   http.StatusUnauthorized,
+    Detail:   "The e-mail or the password is not valid.",
+    Instance: r.URL.Path,
+    Code:     "INVALID_CREDENTIALS",
+})
+```
 
 ## CORS
 

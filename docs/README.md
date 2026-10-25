@@ -38,6 +38,16 @@ Each registered route automatically exposes:
 | `PUT` | `/{path}/{id}` | Update |
 | `DELETE` | `/{path}/{id}` | Delete |
 
+On top of the operations, the handler gives:
+
+* **Lists** with filters, filter groups, filters on related records, ordering, and pages with offsets or cursors, see [List](handler.md#list--get-path).
+* **Rules of the routes**: who can read and change records, server-side filters, e.g. of the signed-in user, fields that the server sets, and structs of their own for each operation, see [Route](handler.md#route), or a layer of your application in front of the registry, see [Business logic](handler.md#business-logic).
+* **Errors** as problems of RFC 9457, `application/problem+json`, with a code of each problem, and the failed validation rules of the fields, see [Errors](handler.md#errors).
+* **Optimistic locking** of the records with a version field, which a stale update gets as `409 VERSION_CONFLICT`.
+* **An OpenAPI document** of the routes, generated from their configuration and their structs, see [OpenAPI](handler.md#openapi).
+* **Observability**: request IDs, JSON logs with the IDs of the requests and their traces, an access log, spans and metrics of OpenTelemetry, e.g. for Prometheus at `/metrics`, and probes of liveness and readiness, see [Logging](handler.md#logging), [Traces and metrics](handler.md#traces-and-metrics) and [Health checks](handler.md#health-checks).
+* **Versions** of the API, as handlers mounted at their prefixes, see [Versions](handler.md#versions).
+
 ## Supported databases
 
 gorestapi delegates all persistence to gocrud, which supports:
@@ -57,8 +67,8 @@ It adds gocrud `v1.0.0-rc.2` too. Import the driver of the database yourself, se
 
 ## Demo
 
-See [Demo](demo.md) for a complete runnable example covering two resources, ownership hooks, and server-side filters.
+See [Demo](demo.md) for a complete runnable example covering two resources, ownership hooks, server-side filters, logs, traces, metrics, health checks and the OpenAPI document with Swagger UI.
 
 ## Handler reference
 
-See [Handler](handler.md) for the full `Route`, `Options`, and response format reference.
+See [Handler](handler.md) for the full reference of `Route`, `Options`, the endpoints, the responses and the problems of the errors.
