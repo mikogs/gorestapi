@@ -4,61 +4,42 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIDelete(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeBadRequest,
-		})
-		return
-	}
-
 	if route.AllowDelete != nil {
-		obj, _, err := h.svc.Read(ctx, key, idInt, nil, nil)
+		obj, err := h.reg.Read(ctx, key, id, nil)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
-				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-					Ok:   true,
-					Code: jsonresp.CodeNotFound,
-				})
+			if isNotFound(err) {
+				h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 				return
 			}
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.writeServiceError(w, r)
 			return
 		}
 		if err := route.AllowDelete(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeForbidden,
-			})
+			h.writeProblem(w, r, CodeForbidden, "", nil)
 			return
 		}
 	}
 
-	err = h.svc.Delete(ctx, key, idInt)
+	err := h.reg.Delete(ctx, key, id)
 	if err != nil {
-		if errors.Is(err, svccrud.NotFoundError) {
-			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeNotFound,
-			})
+		if isNotFound(err) {
+			h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 			return
 		}
 
-		jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-			Ok:   true,
-			Code: CodeServiceError,
-		})
+		// other objects reference the object with a foreign key that does not allow deleting it
+		if errors.Is(err, gocrud.ErrForeignKeyViolation) {
+			h.writeProblem(w, r, jsonresp.CodeForeignKeyViolation, "Other records reference the record.", nil)
+			return
+		}
+
+		h.writeServiceError(w, r)
 		return
 	}
 

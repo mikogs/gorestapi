@@ -4,86 +4,59 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 
-	svccrud "github.com/mikolajgasior/gocrud/pkg/service"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud/pkg/registry"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *http.Request, key string, route Route, id string) {
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		jsonresp.Write(w, http.StatusBadRequest, &jsonresp.Response{
-			Ok:   true,
-			Code: jsonresp.CodeBadRequest,
-		})
-		return
-	}
-
-	var obj interface{}
+	var obj any
 
 	if route.FilterRead != nil {
-		injected := route.FilterRead(r)
-		filterVals := make(map[string]string)
-		filterOps := make(map[string]string)
-		for k, v := range injected.Vals {
-			filterVals[k] = v
+		scope := route.FilterRead(r)
+		filters := registry.Filters{
+			Vals:      map[string]string{"ID": id},
+			ScopeVals: scope.Vals,
+			ScopeOps:  scope.Ops,
 		}
-		for k, v := range injected.Ops {
-			filterOps[k] = v
-		}
-		filterVals["ID"] = id // ID constraint always wins
 
-		objs, _, listErr := h.svc.List(ctx, key, 1, 0, "", "", filterVals, filterOps, nil, route.ReadConstructor, nil)
+		objs, listErr := h.reg.List(ctx, key, registry.ListOptions{Limit: 1, Filters: filters, Constructor: route.ReadConstructor})
+		var validErr *registry.FilterValidationError
+		if errors.As(listErr, &validErr) && validErr.Violations["ID"] != "" {
+			objs, listErr = nil, nil
+		}
 		if listErr != nil {
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.writeServiceError(w, r)
 			return
 		}
 		if len(objs) == 0 {
-			jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-				Ok:   true,
-				Code: jsonresp.CodeNotFound,
-			})
+			h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 			return
 		}
 		obj = objs[0]
 	} else {
-		obj, _, err = h.svc.Read(ctx, key, idInt, route.ReadConstructor, nil)
+		var err error
+		obj, err = h.reg.Read(ctx, key, id, route.ReadConstructor)
 		if err != nil {
-			if errors.Is(err, svccrud.NotFoundError) {
-				jsonresp.Write(w, http.StatusNotFound, &jsonresp.Response{
-					Ok:   true,
-					Code: jsonresp.CodeNotFound,
-				})
+			if isNotFound(err) {
+				h.writeProblem(w, r, jsonresp.CodeNotFound, "", nil)
 				return
 			}
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.writeServiceError(w, r)
 			return
 		}
 	}
 
 	if route.AllowRead != nil {
 		if err := route.AllowRead(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusForbidden, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeForbidden,
-			})
+			h.writeProblem(w, r, CodeForbidden, "", nil)
 			return
 		}
 	}
 
 	if route.PostRead != nil {
 		if err := route.PostRead(obj, r); err != nil {
-			jsonresp.Write(w, http.StatusInternalServerError, &jsonresp.Response{
-				Ok:   true,
-				Code: CodeServiceError,
-			})
+			h.logServiceError(w, r, "error of PostRead", err)
 			return
 		}
 	}
@@ -91,6 +64,6 @@ func (h *Handler) handleAPIRead(ctx context.Context, w http.ResponseWriter, r *h
 	jsonresp.Write(w, http.StatusOK, &jsonresp.Response{
 		Ok:   true,
 		Code: jsonresp.CodeSuccess,
-		Data: responseData(obj, h.svc.PasswordFieldNames(key)),
+		Data: responseData(obj, h.reg.PasswordFieldNames(key)),
 	})
 }

@@ -1,0 +1,23 @@
+version: "2"
+
+# The standard linters, with the linters of security, e.g. gosec, and of the use of databases, HTTP and contexts.
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - gosec
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+  exclusions:
+    rules:
+      # tests make requests and queries without contexts, e.g. with httptest.NewRequest
+      - path: _test\.go
+        linters:
+          - noctx
+
+formatters:
+  enable:
+    - gofmt

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
 )
 
 // filterByFlags returns a FilterRead func that injects a Flags equality filter
@@ -25,7 +25,7 @@ func filterReadByOwner() func(*http.Request) FilterSet {
 func TestFilterRead_ReturnsMatchingRecord(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	ts.Flags = 7
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 
@@ -46,7 +46,7 @@ func TestFilterRead_ReturnsMatchingRecord(t *testing.T) {
 func TestFilterRead_Returns404OnMismatch(t *testing.T) {
 	recreateTestStructTable()
 
-	ts := test.TestStructWithData()
+	ts := fixtures.TestStructWithData()
 	ts.Flags = 7
 	_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 

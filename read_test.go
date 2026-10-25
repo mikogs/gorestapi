@@ -8,16 +8,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func TestServe_Read(t *testing.T) {
 	recreateTestStructTable()
 
 	// Insert an object first
-	objSaved := test.TestStructWithData()
+	objSaved := fixtures.TestStructWithData()
 	_ = testCRUD.Save(context.Background(), objSaved, gocrud.SaveOptions{})
 
 	// Get object
@@ -46,7 +46,7 @@ func TestServe_Read(t *testing.T) {
 		t.Fatalf("failed to marshal response data: %v", err)
 	}
 
-	var objReturned test.TestStruct
+	var objReturned fixtures.TestStruct
 	err = json.Unmarshal(dataBytes, &objReturned)
 	if err != nil {
 		t.Fatalf("failed to unmarshal data to TestStruct: %v", err)

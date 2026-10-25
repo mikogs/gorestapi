@@ -1,0 +1,25 @@
+name: vulncheck
+
+# Checks the code and the dependencies for known vulnerabilities, see scripts/vulncheck.sh, also every week, as new
+# vulnerabilities are found in the dependencies without any change of the code.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: ./scripts/vulncheck.sh

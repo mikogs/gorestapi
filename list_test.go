@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 func TestServe_List(t *testing.T) {
@@ -17,7 +17,7 @@ func TestServe_List(t *testing.T) {
 
 	// Insert some data that should be ignored by Get later on
 	for i := 1; i < 51; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.Age = 10 + i
 		ts.Price = 444
@@ -27,7 +27,7 @@ func TestServe_List(t *testing.T) {
 
 	// Insert data that should be selected by filters
 	for i := 1; i < 51; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.Age = 30 + i
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
@@ -54,7 +54,7 @@ func TestServe_List(t *testing.T) {
 		t.Error("expected Data field to be present in response")
 	}
 
-	dataSlice, ok := resp.Data.([]interface{})
+	dataSlice, ok := resp.Data.([]any)
 	if !ok {
 		t.Fatal("expected Data to be a slice")
 	}
@@ -68,7 +68,7 @@ func TestServe_List(t *testing.T) {
 		t.Fatalf("failed to marshal item at index 2: %v", err)
 	}
 
-	var objReturned test.TestStruct
+	var objReturned fixtures.TestStruct
 	err = json.Unmarshal(dataBytes, &objReturned)
 	if err != nil {
 		t.Fatalf("failed to unmarshal item at index 2 to TestStruct: %v", err)

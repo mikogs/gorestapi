@@ -3,14 +3,13 @@ package gorestapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mikolajgasior/gocrud"
-	"github.com/mikolajgasior/gocrud/pkg/test"
-	"github.com/mikolajgasior/gorestapi/pkg/jsonresp"
+	"github.com/mikogs/gocrud"
+	"github.com/mikogs/gorestapi/internal/fixtures"
+	"github.com/mikogs/gorestapi/pkg/jsonresp"
 )
 
 // handlerWith returns a new Handler using the shared testService but with the
@@ -29,6 +28,7 @@ func TestServe_DisableCreate(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableCreate})
 
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", nil)
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 
@@ -42,6 +42,7 @@ func TestServe_DisableUpdate(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableUpdate})
 
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/1", nil)
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 
@@ -97,13 +98,13 @@ func TestServe_DisableFilters(t *testing.T) {
 
 	// Insert rows with two distinct PrimaryEmail values.
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "a@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 	}
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "b@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
@@ -112,7 +113,7 @@ func TestServe_DisableFilters(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableFilters})
 
 	// Request with a filter that would normally narrow to 3 rows — should be ignored.
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
@@ -129,13 +130,13 @@ func TestServe_AllowedFilters_AllowedFieldIsApplied(t *testing.T) {
 	recreateTestStructTable()
 
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "a@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 	}
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "b@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
@@ -143,7 +144,7 @@ func TestServe_AllowedFilters_AllowedFieldIsApplied(t *testing.T) {
 
 	h := handlerWith(Route{AllowedFilters: []string{"PrimaryEmail"}})
 
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
@@ -160,13 +161,13 @@ func TestServe_AllowedFilters_DisallowedFieldIsIgnored(t *testing.T) {
 	recreateTestStructTable()
 
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "a@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
 	}
 	for i := 0; i < 3; i++ {
-		ts := test.TestStructWithData()
+		ts := fixtures.TestStructWithData()
 		ts.ID = 0
 		ts.PrimaryEmail = "b@example.com"
 		_ = testCRUD.Save(context.Background(), ts, gocrud.SaveOptions{})
@@ -175,7 +176,7 @@ func TestServe_AllowedFilters_DisallowedFieldIsIgnored(t *testing.T) {
 	// Only "Age" is allowed — PrimaryEmail filter should be dropped.
 	h := handlerWith(Route{AllowedFilters: []string{"Age"}})
 
-	url := fmt.Sprintf("/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq")
+	url := "/teststruct/?limit=100&filter_val_PrimaryEmail=a@example.com&filter_op_PrimaryEmail=eq"
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
@@ -207,7 +208,7 @@ func responseDataLen(t *testing.T, body []byte) int {
 	if err := json.Unmarshal(body, &resp); err != nil {
 		t.Fatalf("could not unmarshal response: %v", err)
 	}
-	data, ok := resp.Data.([]interface{})
+	data, ok := resp.Data.([]any)
 	if !ok {
 		t.Fatalf("response data is not a slice")
 	}
