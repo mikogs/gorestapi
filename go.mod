@@ -10,12 +10,14 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.12.3
-	github.com/mikogs/gocrud v1.0.0-rc.2
+	github.com/mikogs/gocrud v1.0.0
+	github.com/rs/cors v1.11.1
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/metric v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
+	golang.org/x/time v0.16.0
 )
 
 require (

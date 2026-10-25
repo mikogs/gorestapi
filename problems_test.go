@@ -1,6 +1,7 @@
 package gorestapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,9 @@ import (
 func serveProblem(t *testing.T, h http.Handler, method string, path string, body string) (*httptest.ResponseRecorder, map[string]any) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(method, path, strings.NewReader(body)))
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(w, req)
 	if contentType := w.Header().Get("Content-Type"); contentType != "application/problem+json" {
 		t.Fatalf("%s %s returned the content type %q, want application/problem+json", method, path, contentType)
 	}
@@ -92,5 +95,47 @@ func TestProblemTypes(t *testing.T) {
 		if slug := problemSlug(code); strings.ContainsAny(slug, "_ ") || slug != strings.ToLower(slug) {
 			t.Fatalf("the slug of %s is %q, want lower case letters and hyphens", code, slug)
 		}
+	}
+}
+
+func TestBodies(t *testing.T) {
+	recreateTestStructTable()
+	h := New(testService, Options{Routes: map[string]Route{"teststruct": {}}, MaxBodyBytes: 200})
+	for name, test := range map[string]struct {
+		contentType string
+		body        string
+		status      int
+		code        string
+		errors      map[string]any
+	}{
+		"not JSON":         {"text/plain", `{}`, http.StatusUnsupportedMediaType, jsonresp.CodeUnsupportedMediaType, nil},
+		"no content type":  {"", `{}`, http.StatusUnsupportedMediaType, jsonresp.CodeUnsupportedMediaType, nil},
+		"too large":        {"application/json", `{"FirstName":"` + strings.Repeat("a", 300) + `"}`, http.StatusRequestEntityTooLarge, jsonresp.CodeRequestTooLarge, nil},
+		"an unknown field": {"application/json", `{"FirstName":"Jo","Nickname":"J"}`, http.StatusBadRequest, jsonresp.CodeValidationFailed, map[string]any{"Nickname": "unknown"}},
+		"invalid JSON":     {"application/json", `{"FirstName":`, http.StatusBadRequest, jsonresp.CodeUnmarshalRequest, nil},
+	} {
+		req := httptest.NewRequest(http.MethodPut, "/teststruct/", strings.NewReader(test.body))
+		if test.contentType != "" {
+			req.Header.Set("Content-Type", test.contentType)
+		}
+		w := httptest.NewRecorder()
+		h.Serve(w, req)
+		var problem map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &problem)
+		errors, _ := problem["errors"].(map[string]any)
+		if w.Code != test.status || problem["code"] != test.code || test.errors != nil && !reflect.DeepEqual(errors, test.errors) {
+			t.Fatalf("a create with %s returned %d %v, want %d %s with %v", name, w.Code, problem, test.status, test.code, test.errors)
+		}
+	}
+
+	// the fields of a newer version of a client, with AllowUnknownFields
+	h = New(testService, Options{Routes: map[string]Route{"teststruct": {}}, AllowUnknownFields: true})
+	body, _ := json.Marshal(map[string]any{"Nickname": "J"})
+	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.Serve(w, req)
+	if strings.Contains(w.Body.String(), "unknown") {
+		t.Fatalf("a create with an unknown field and AllowUnknownFields returned %d %s", w.Code, w.Body.String())
 	}
 }

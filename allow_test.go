@@ -21,6 +21,7 @@ func TestAllow_Create_Allows(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"Key": "allow-create-allows-00000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -39,6 +40,7 @@ func TestAllow_Create_Rejects(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"Key": "allow-create-rejects-0000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -63,6 +65,7 @@ func TestAllow_Update_Allows(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -84,6 +87,7 @@ func TestAllow_Update_Rejects(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -110,6 +114,7 @@ func TestAllow_Update_ReceivesStoredRecord(t *testing.T) {
 	var seenFirstName string
 	body, _ := json.Marshal(map[string]any{"FirstName": "IncomingName"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{

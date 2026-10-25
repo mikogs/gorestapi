@@ -43,6 +43,7 @@ On top of the operations, the handler gives:
 * **Lists** with filters, filter groups, filters on related records, ordering, and pages with offsets or cursors, see [List](handler.md#list--get-path).
 * **Rules of the routes**: who can read and change records, server-side filters, e.g. of the signed-in user, fields that the server sets, and structs of their own for each operation, see [Route](handler.md#route), or a layer of your application in front of the registry, see [Business logic](handler.md#business-logic).
 * **Errors** as problems of RFC 9457, `application/problem+json`, with a code of each problem, and the failed validation rules of the fields, see [Errors](handler.md#errors).
+* **Security**: authentication of bearer tokens, e.g. JWTs of [jwtauth](jwt.md) or of an identity provider, rate limits of each client, strict request bodies, and the headers of security of the responses, with CORS by any middleware, see [Authentication](handler.md#authentication), [Rate limits](handler.md#rate-limits), [Request bodies](handler.md#request-bodies), [Security headers](handler.md#security-headers) and [CORS](handler.md#cors).
 * **Optimistic locking** of the records with a version field, which a stale update gets as `409 VERSION_CONFLICT`.
 * **An OpenAPI document** of the routes, generated from their configuration and their structs, see [OpenAPI](handler.md#openapi).
 * **Observability**: request IDs, JSON logs with the IDs of the requests and their traces, an access log, spans and metrics of OpenTelemetry, e.g. for Prometheus at `/metrics`, and probes of liveness and readiness, see [Logging](handler.md#logging), [Traces and metrics](handler.md#traces-and-metrics) and [Health checks](handler.md#health-checks).
@@ -63,7 +64,7 @@ gorestapi delegates all persistence to gocrud, which supports:
 go get github.com/mikogs/gorestapi
 ```
 
-It adds gocrud `v1.0.0-rc.2` too. Import the driver of the database yourself, see [Supported databases](#supported-databases).
+It adds gocrud `v1.0.0` too. Import the driver of the database yourself, see [Supported databases](#supported-databases).
 
 ## Demo
 

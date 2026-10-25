@@ -46,6 +46,7 @@ func TestServe_CreateConstructor(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"Key": key})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -88,6 +89,7 @@ func TestServe_UpdateConstructor(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"FirstName": "UpdatedViaOverride"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{

@@ -79,6 +79,11 @@ func TestOpenAPI(t *testing.T) {
 	if doc.Paths.Find("/orders/{id}").Delete != nil || doc.Paths.Find("/customers/{id}").Delete == nil {
 		t.Fatal("the document has the delete of orders, which the route disables, or not the delete of customers")
 	}
+	update := doc.Paths.Find("/orders/{id}").Put.Responses
+	if update.Status(http.StatusRequestEntityTooLarge) == nil || update.Status(http.StatusUnsupportedMediaType) == nil ||
+		update.Status(http.StatusTooManyRequests) != nil || update.Status(http.StatusUnauthorized) != nil {
+		t.Fatal("the update has not the responses 413 and 415 of its body, or has 401 and 429 without Authenticate and RateLimiter")
+	}
 	list := doc.Paths.Find("/orders/").Get
 	params := map[string]bool{}
 	for _, param := range list.Parameters {
@@ -143,5 +148,43 @@ func TestOperationName(t *testing.T) {
 		if got := operationName(path); got != want {
 			t.Fatalf("operationName(%q) returned %q, want %q", path, got, want)
 		}
+	}
+}
+
+func TestOpenAPI_Authentication(t *testing.T) {
+	h := New(testService, Options{
+		Authenticate: Bearer(func(context.Context, string) (any, error) { return nil, nil }),
+		RateLimiter:  NewRateLimiter(1, 1),
+		Routes:       map[string]Route{"teststruct": {}, "public": {RegistryKey: "teststruct", Anonymous: true, Flags: DisableCreate | DisableUpdate | DisableDelete}},
+	})
+	data, err := h.OpenAPI(OpenAPIInfo{Title: "Test", Version: "1.0.0", BearerFormat: "JWT"})
+	if err != nil {
+		t.Fatalf("OpenAPI failed: %s", err.Error())
+	}
+	doc, err := openapi3.NewLoader().LoadFromData(data)
+	if err != nil || doc.Validate(context.Background()) != nil {
+		t.Fatalf("the document is not valid: %v", err)
+	}
+	scheme := doc.Components.SecuritySchemes["bearerAuth"]
+	if scheme == nil || scheme.Value.Type != "http" || scheme.Value.Scheme != "bearer" || scheme.Value.BearerFormat != "JWT" {
+		t.Fatalf("the security scheme is %+v, want the bearer tokens of JWT", scheme)
+	}
+	if len(doc.Security) != 1 || doc.Security[0]["bearerAuth"] == nil {
+		t.Fatalf("the security of the document is %v, want bearerAuth", doc.Security)
+	}
+	if doc.Paths.Find("/teststruct/").Get.Responses.Status(http.StatusUnauthorized) == nil {
+		t.Fatal("the list has no response 401")
+	}
+	if doc.Paths.Find("/teststruct/{id}").Delete.Responses.Status(http.StatusTooManyRequests) == nil {
+		t.Fatal("the delete has no response 429 of the rate limiter")
+	}
+	public := doc.Paths.Find("/public/").Get
+	if public.Security == nil || len(*public.Security) != 2 || len((*public.Security)[0]) != 0 {
+		t.Fatalf("the security of the anonymous route is %v, want none or bearerAuth", public.Security)
+	}
+
+	// without Authenticate, the document has no security
+	if doc := loadOpenAPI(t, New(testService, Options{Routes: map[string]Route{"teststruct": {}}})); doc.Components.SecuritySchemes != nil || doc.Security != nil {
+		t.Fatalf("a document without authentication has the security %v %v", doc.Components.SecuritySchemes, doc.Security)
 	}
 }

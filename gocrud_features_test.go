@@ -81,6 +81,7 @@ func serveJSON(t *testing.T, h *Handler, method string, path string, userID uint
 	}
 
 	req := httptest.NewRequest(method, path, reader)
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-ID", strconv.FormatUint(userID, 10))
 	w := httptest.NewRecorder()
 	h.Serve(w, req)

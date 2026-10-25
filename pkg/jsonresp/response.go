@@ -21,6 +21,10 @@ const (
 	// CodeVersionConflict is returned when an update has a version of the object other than the stored one, as the
 	// object was changed since the client read it.
 	CodeVersionConflict = "VERSION_CONFLICT"
+	// CodeRequestTooLarge is returned for a request body larger than the limit of the handler.
+	CodeRequestTooLarge = "REQUEST_TOO_LARGE"
+	// CodeUnsupportedMediaType is returned for a request body that is not JSON, by its Content-Type.
+	CodeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
 )
 
 type Response struct {

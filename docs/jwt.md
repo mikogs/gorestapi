@@ -239,6 +239,28 @@ Replace the signing key from time to time, or at once when it may have leaked. T
 
 When the old key leaked, skip the waiting: deploy the new key without `JWT_PREVIOUS_PUBLIC_KEY`, which logs out all the users, but also rejects the tokens that someone else signed with the old key.
 
+## With the handler
+
+The handler of gorestapi verifies the tokens of the requests with `Options.Authenticate`, and the hooks of its routes get their claims with `gorestapi.Principal`, see [Authentication](handler.md#authentication):
+
+```go
+handler := gorestapi.New(reg, gorestapi.Options{
+    Authenticate: gorestapi.Bearer(func(_ context.Context, token string) (any, error) {
+        claims, ok := p.Parse(token, audience)
+        if !ok {
+            return nil, errors.New("invalid token")
+        }
+        return claims, nil
+    }),
+    Routes: routes,
+})
+
+// in a hook
+claims, _ := gorestapi.Principal(r.Context()).(*jwtauth.CustomClaims)
+```
+
+With a `JWKSValidator`, `verify` returns `validator.Validate(ctx, token)`. The [demo](demo.md#logins) issues the tokens at `POST /token`, for the e-mail and the password of a user.
+
 ## Complete example
 
 ```go

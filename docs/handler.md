@@ -17,7 +17,7 @@ handler := gorestapi.New(reg, gorestapi.Options{})
 
 | Argument | Type | Description |
 |---|---|---|
-| `reg` | `gorestapi.Registry` | A registry of the structs, usually `*registry.CRUD` of gocrud, see [Registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/pkgs/registry.md), or a layer of your application in front of it, see [Business logic](#business-logic) |
+| `reg` | `gorestapi.Registry` | A registry of the structs, usually `*registry.CRUD` of gocrud, see [Registry](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/pkgs/registry.md), or a layer of your application in front of it, see [Business logic](#business-logic) |
 | `options` | `gorestapi.Options` | Configuration for the handler (zero value is valid) |
 
 ### Business logic
@@ -51,7 +51,6 @@ The handler maps the errors of the registry to its responses, so the layer retur
 
 ```go
 type Options struct {
-    CORS        cors.CORS
     Routes      map[string]Route
     UserIDFunc  func(r *http.Request) any
     MaxFilters  int
@@ -62,12 +61,20 @@ type Options struct {
     AccessLog   bool
     TracerProvider trace.TracerProvider
     MeterProvider  metric.MeterProvider
+    Authenticate   func(r *http.Request) (any, error)
+    RateLimiter    RateLimiter
+    RateLimitKey   func(r *http.Request) string
+    TrustedProxies []netip.Prefix
+    DisableSecurityHeaders bool
+    CacheControl   string
+    HSTSMaxAge     time.Duration
+    MaxBodyBytes   int64
+    AllowUnknownFields bool
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `CORS` | `cors.CORS` | CORS headers written on every response. Zero value emits no CORS headers. |
 | `Routes` | `map[string]Route` | Per-route configuration keyed by URL path segment. Only the paths in the map are served, other paths are the `404` problem `NOT_FOUND`. A route with the zero value has all operations enabled and all filters allowed, e.g. `"notes": {}`. |
 | `UserIDFunc` | `func(*http.Request) any` | Called on every create and update request to obtain the current user's ID, passed to the registry as `ModifiedBy`: a `uint64`, or a `string` for `CreatedBy` and `ModifiedBy` fields of type `string`, e.g. the subject of a JWT. When `nil`, or when it returns `nil`, `ModifiedBy` is `0` or `""`. When the struct has the `CreatedAt`, `CreatedBy`, `ModifiedAt` and `ModifiedBy` fields, gocrud sets them from this ID and the time of the request, ignores the values sent in the request body, and never changes `CreatedAt` and `CreatedBy` on an update. |
 | `MaxFilters` | `int` | The largest number of `filter_val_*` parameters of a list request, otherwise the response is the `400` problem `VALIDATION_FAILED` with `{"filters": "max"}` in `errors`. `0` is `DefaultMaxFilters` (20), and a negative value is no limit. |
@@ -77,6 +84,15 @@ type Options struct {
 | `Logger` | `*slog.Logger` | The logger of the handler, `slog.Default()` when `nil`, see [Logging](#logging). |
 | `AccessLog` | `bool` | Logs every request with `Logger`, at the info level, see [Logging](#logging). |
 | `TracerProvider`, `MeterProvider` | `trace.TracerProvider`, `metric.MeterProvider` | The providers of OpenTelemetry of the spans and the metrics of the requests, or the global ones when `nil`, see [Traces and metrics](#traces-and-metrics). |
+| `Authenticate` | `func(*http.Request) (any, error)` | Returns the principal of a request, e.g. the claims of its token, or an error, which is the `401` problem `UNAUTHORIZED`, see [Authentication](#authentication). When `nil`, the requests are not authenticated. |
+| `RateLimiter` | `gorestapi.RateLimiter` | Limits the requests of each client, e.g. `gorestapi.NewRateLimiter(10, 20)`, with the `429` problem `TOO_MANY_REQUESTS` over the limit, see [Rate limits](#rate-limits). When `nil`, there is no limit. |
+| `RateLimitKey` | `func(*http.Request) string` | The key of the limit of a request, e.g. its user. When `nil`, the IP of the client, see [Rate limits](#rate-limits). |
+| `TrustedProxies` | `[]netip.Prefix` | The networks of the proxies in front of the API, e.g. of its load balancer, whose `X-Forwarded-For` header has the IP of the client, see [Client IPs](#client-ips). |
+| `DisableSecurityHeaders` | `bool` | Leaves out the headers of security of the responses, e.g. when a proxy sets them, see [Security headers](#security-headers). |
+| `CacheControl` | `string` | The `Cache-Control` header of the responses, `no-store` when it is empty, see [Security headers](#security-headers). |
+| `HSTSMaxAge` | `time.Duration` | Sends `Strict-Transport-Security` for this long, e.g. a year, see [Security headers](#security-headers). It is not sent when it is `0`. |
+| `MaxBodyBytes` | `int64` | The largest body of a create or an update, otherwise the response is the `413` problem `REQUEST_TOO_LARGE`. `0` is `jsonreq.DefaultMaxBytes` (1 MiB), and a negative value is no limit, see [Request bodies](#request-bodies). |
+| `AllowUnknownFields` | `bool` | Ignores the fields of a body that the struct does not have, instead of the `400` problem `VALIDATION_FAILED`, see [Request bodies](#request-bodies). |
 
 The limits keep a request cheap for the database, whatever its filters. Also set a timeout of the queries in PostgreSQL, which applies to all of them, e.g. with `statement_timeout=10000` (milliseconds) in the connection string, which works with both lib/pq and pgx: `postgres://user:pass@host/db?statement_timeout=10000`.
 
@@ -177,11 +193,20 @@ Each `Allow*` hook is called with the loaded object and the request. Return a no
 
 `AllowUpdate` receives the record as stored in the database so it reflects the original owner or state — the incoming request values have not been applied yet.
 
+`userID` returns the user of the request from its [principal](#authentication), e.g. the subject of the claims of its JWT:
+
 ```go
+func userID(r *http.Request) uint64 {
+    claims, ok := gorestapi.Principal(r.Context()).(*jwtauth.CustomClaims)
+    if !ok {
+        return 0
+    }
+    id, _ := strconv.ParseUint(claims.Subject, 10, 64)
+    return id
+}
+
 noteOwner := func(obj any, r *http.Request) error {
-    note := obj.(*Note)
-    headerUserID, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
-    if note.UserID != headerUserID {
+    if obj.(*Note).UserID != userID(r) {
         return errors.New("not the note owner")
     }
     return nil
@@ -213,12 +238,12 @@ Routes: map[string]gorestapi.Route{
     "notes": {
         FilterList: func(r *http.Request) gorestapi.FilterSet {
             return gorestapi.FilterSet{
-                Vals: map[string]string{"UserID": r.Header.Get("X-User-ID")},
+                Vals: map[string]string{"UserID": strconv.FormatUint(userID(r), 10)},
             }
         },
         FilterRead: func(r *http.Request) gorestapi.FilterSet {
             return gorestapi.FilterSet{
-                Vals: map[string]string{"UserID": r.Header.Get("X-User-ID")},
+                Vals: map[string]string{"UserID": strconv.FormatUint(userID(r), 10)},
             }
         },
     },
@@ -227,7 +252,7 @@ Routes: map[string]gorestapi.Route{
 
 **Pre hooks — PreCreate / PreUpdate**
 
-Called with the fully-prepared object just before it is written to the database. The request body has already been applied, and the ID is the one from the URL for an update, and `0` for a create. Use these to stamp server-controlled fields that should not be settable by the client.
+Called with the fully-prepared object just before it is written to the database. The request body has already been applied, and the ID is the one from the URL for an update, and `0` for a create. Use these to stamp server-controlled fields that should not be settable by the client, e.g. the owner of a record, `obj.(*Note).UserID = userID(r)`, so that a client cannot create a record of another user, or give its record to one.
 
 Return a non-nil error to abort the operation with the `500` problem `SERVICE_ERROR`. The error is logged, see [Logging](#logging), and not sent to the client.
 
@@ -296,16 +321,164 @@ Routes: map[string]gorestapi.Route{
 }
 ```
 
+## Request bodies
+
+The body of a create or an update is read strictly, so that a client finds its mistakes, and cannot make the API read more than it needs:
+
+* **The content type** has to be `application/json`, or a JSON type of its own, e.g. `application/merge-patch+json`, with any parameters, e.g. `; charset=utf-8`. Another one, or none, is the `415` problem `UNSUPPORTED_MEDIA_TYPE`. This also keeps a page of another site from sending a create of a form to the API, as a browser sends a JSON content type only from the origins that [CORS](#cors) allows.
+* **The size** is at most `MaxBodyBytes`, 1 MiB by default. A larger body is the `413` problem `REQUEST_TOO_LARGE`, and the rest of it is not read.
+* **A field that the struct does not have**, e.g. `Titel` instead of `Title`, is the `400` problem `VALIDATION_FAILED` with `{"Titel": "unknown"}` in `errors`, as it would be silently lost otherwise. Set `AllowUnknownFields` to ignore such fields, e.g. for clients that send the fields of a newer version of the API. The names of the fields are matched in any letter case, as with `encoding/json`.
+* **One JSON value**: a body with more after the object, e.g. two objects, is the `400` problem `UNMARSHAL_REQUEST`.
+
+The handlers of your application read bodies the same way with `jsonreq.Decode`:
+
+```go
+var credentials struct{ Email, Password string }
+err := jsonreq.Decode(w, r, &credentials, jsonreq.Options{MaxBytes: 4096})
+// errors.Is(err, jsonreq.ErrContentType), errors.Is(err, jsonreq.ErrTooLarge), or a *jsonreq.UnknownFieldError
+```
+
+## Authentication
+
+The handler authenticates the requests with `Options.Authenticate`, which returns the principal of a request, e.g. the claims of its token, or an error. It does not decide who can do what: the hooks of the routes do, with the principal, see [Route](#route). `gorestapi.Bearer` reads the token of the `Authorization: Bearer` header, and passes it to a function that verifies it, e.g. of a JWT of [jwtauth](jwt.md):
+
+```go
+provider, err := jwtauth.NewProvider("https://api.example.com", signingKey)
+
+handler := gorestapi.New(reg, gorestapi.Options{
+    Authenticate: gorestapi.Bearer(func(ctx context.Context, token string) (any, error) {
+        claims, ok := provider.Parse(token, "notes")
+        if !ok {
+            return nil, errors.New("invalid token")
+        }
+        return claims, nil
+    }),
+    UserIDFunc: func(r *http.Request) any { return userID(r) },
+    Routes:     routes,
+})
+```
+
+* **Every request** of a route, except `OPTIONS`, is authenticated before its operation. `gorestapi.Principal(r.Context())` returns the principal in the hooks and in `UserIDFunc`, e.g. the `*jwtauth.CustomClaims` above.
+* **A request without credentials**, for which `Authenticate` returns `gorestapi.ErrNoCredentials`, as `Bearer` does for a request without a token, is the `401` problem `UNAUTHORIZED`, with the header `WWW-Authenticate: Bearer`. Another error, e.g. of an expired token, is the same problem, with `WWW-Authenticate: Bearer error="invalid_token"`, as RFC 6750 says. The error is logged at the debug level, and not sent, so that clients cannot learn which part of a token is wrong.
+* **A route with `Anonymous`** serves the requests without credentials, e.g. a sign-up, or public records, with no principal. A request with a token that is not valid is still the `401` problem, so that a client finds out that its token expired. The hooks of the route decide what an anonymous request can do, e.g. `AllowUpdate` rejects a request without a principal.
+* **Tokens are read only from the header**, not from the URL, e.g. `?access_token=`, which is kept in the logs of proxies and in the history of browsers.
+* **The handlers of logins**, e.g. `POST /token`, are of your application, as in the [demo](demo.md#logins): check the password with `VerifyPasswords` of the [registry](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/pkgs/registry.md), respond to an unknown user and a wrong password with the same problem, and limit the logins of each client with a [rate limiter](#rate-limits) of their own, against guessing the passwords.
+
+**Identity providers.** The tokens of an identity provider of OpenID Connect, e.g. Keycloak, Auth0, Okta or Microsoft Entra ID, are JWTs signed with the keys of its JWKS, which `jwtauth.JWKSValidator` fetches and keeps, see [Validating tokens from a remote issuer](jwt.md#validating-tokens-from-a-remote-issuer). The users log in at the provider, e.g. with the flow of OAuth 2 of a web app, and the API only verifies their tokens:
+
+```go
+validator, err := jwtauth.NewJWKSValidator(
+    "https://auth.example.com/realms/app/protocol/openid-connect/certs", // the jwks_uri of the provider
+    "https://auth.example.com/realms/app",                               // its issuer
+    "notes",                                                              // the audience of the API
+)
+
+Authenticate: gorestapi.Bearer(func(ctx context.Context, token string) (any, error) {
+    return validator.Validate(ctx, token)
+}),
+```
+
+**Other credentials.** `verify` of `Bearer` can verify any token, e.g. a PASETO, or an API key, by looking it up, and `Authenticate` can read other credentials than a bearer token, e.g. the session cookie of a web app, or a client certificate of mutual TLS, from `r.TLS.PeerCertificates`. A cookie is sent by the browser also with the requests of other sites, so an API with cookies needs a protection against CSRF too, e.g. the `SameSite=Strict` attribute of the cookie, while the JSON content type of the [request bodies](#request-bodies) keeps the forms of other sites out. Bearer tokens are not sent by browsers on their own, so they need none.
+
+The [OpenAPI](#openapi) document of a handler with `Authenticate` declares the bearer tokens as its security.
+
+## Rate limits
+
+`Options.RateLimiter` limits the requests of each client, after they are authenticated, so that one client cannot use up the API, e.g. its connections of the database:
+
+```go
+handler := gorestapi.New(reg, gorestapi.Options{
+    // 10 requests a second of each client, with bursts of 20
+    RateLimiter: gorestapi.NewRateLimiter(10, 20),
+    Routes:      routes,
+})
+```
+
+* **A request over the limit** is the `429` problem `TOO_MANY_REQUESTS`, with the seconds until the next request in the `Retry-After` header, and is logged at the debug level.
+* **`NewRateLimiter(perSecond, burst)`** keeps a token bucket of each key in the memory of the process: it serves `perSecond` requests a second, and up to `burst` at once. The buckets that are not used are dropped, so the memory is of the clients of the last minutes.
+* **The key** is the IP of the client, see [Client IPs](#client-ips), or its network `/64` for IPv6, as a client usually has a whole `/64`, and could change its IP in it for every request. Set `RateLimitKey` for another key, e.g. the user of the principal, so that the users behind one IP, e.g. of an office, have limits of their own:
+
+```go
+RateLimitKey: func(r *http.Request) string {
+    if claims, ok := gorestapi.Principal(r.Context()).(*jwtauth.CustomClaims); ok {
+        return "user:" + claims.Subject
+    }
+    return gorestapi.ClientIPKey(gorestapi.ClientIP(r, trustedProxies))
+},
+```
+
+* **Several instances** of the API have limits of their own with `NewRateLimiter`, so a client can send the limit to each of them. To share the limits, implement `gorestapi.RateLimiter` with a store of all the instances, e.g. Redis:
+
+```go
+type RateLimiter interface {
+    // Allow returns whether a request of key can be served now, or how long until the next one can be.
+    Allow(ctx context.Context, key string) (bool, time.Duration, error)
+}
+```
+
+A limiter that returns an error, e.g. when Redis is down, lets the request through, and the error is logged at the error level, so that the API works without it.
+
+* **The limits of the handler** are of its routes. Limit the other handlers too, e.g. of logins, with a limiter of their own, and a lower limit, e.g. `NewRateLimiter(1, 5)`, as in the [demo](demo.md#logins).
+* **A limit is not a protection against DDoS**: the requests over it are cheap, but they still reach the process. A flood of requests is stopped in front of the API, e.g. by a CDN or a load balancer, which can also limit the requests before they reach any instance.
+
+### Client IPs
+
+`gorestapi.ClientIP(r, trustedProxies)` returns the IP of the client of a request, for the rate limits and the [access log](#logging): the IP of its connection, or, when the connection is of a trusted proxy, e.g. of a load balancer, the last IP of its `X-Forwarded-For` header that is not of a trusted proxy. The header of other clients is not read, as a client can send any IP in it, e.g. a new one for every request, to get around the limits:
+
+```go
+TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}, // the network of the load balancer
+```
+
+Without `TrustedProxies`, the IP behind a proxy is the IP of the proxy, so all the clients share one limit. List only the networks of your proxies, not e.g. `0.0.0.0/0`, which would trust the header of every client.
+
+## Security headers
+
+Every response of the handler has the headers that keep browsers from using it in other ways than as the data of a client:
+
+| Header | Value | Why |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | A browser does not read a response as another type than its content type, e.g. as a script or a page |
+| `X-Frame-Options` | `DENY` | A page of another site cannot show the response in a frame |
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'` | A response that a browser shows as a page, e.g. a record with HTML in it, cannot load or run anything |
+| `Referrer-Policy` | `no-referrer` | The URL of the API, e.g. with the filters of a list, is not sent to other sites |
+| `Cache-Control` | `no-store`, or `CacheControl` | Browsers and proxies do not keep the records of a user, e.g. on a shared computer. Set `CacheControl`, e.g. to `public, max-age=60`, for an API of public data |
+| `Strict-Transport-Security` | `max-age=…; includeSubDomains`, with `HSTSMaxAge` | Browsers use only HTTPS for the domain. It is not sent by default, as it applies to the whole domain, and should be sent over HTTPS only, e.g. by the proxy that ends TLS |
+
+Set `DisableSecurityHeaders` when a proxy in front of the API sets them, or to set others in a middleware. The handlers that are not of the routes, e.g. of the [OpenAPI document](#openapi), need headers of their own.
+
+## CORS
+
+A web app of another origin, e.g. `https://app.example.com` with the API at `https://api.example.com`, can call the API from a browser only when the API allows it with the headers of CORS. The handler does not write them, so that the API can use any middleware of CORS, e.g. [rs/cors](https://github.com/rs/cors), in front of it:
+
+```go
+import "github.com/rs/cors"
+
+api := cors.New(cors.Options{
+    AllowedOrigins: []string{"https://app.example.com"},
+    AllowedMethods: []string{http.MethodGet, http.MethodPut, http.MethodDelete},
+    AllowedHeaders: []string{"Authorization", "Content-Type", gorestapi.RequestIDHeader},
+    ExposedHeaders: []string{gorestapi.RequestIDHeader, "Allow", "Retry-After"},
+    MaxAge:         600, // seconds a browser keeps the preflight
+}).Handler(http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
+
+mux.Handle("/api/", api)
+```
+
+* **The origins** are the ones of your web apps. `*`, any origin, lets any site read the responses of the users of its pages, which is safe only for an API of public data without credentials.
+* **`AllowCredentials`** lets the browser send cookies to the API, and is needed only for an API with cookies, see [Authentication](#authentication). Bearer tokens are sent by the web app in the `Authorization` header, which is in `AllowedHeaders`.
+* **The preflight** of a browser, an `OPTIONS` request, is answered by the middleware. An `OPTIONS` request that reaches the handler, e.g. without the headers of a preflight, is answered with `204 No Content` and the methods of the URL in the `Allow` header, without authentication.
+
 ## Logging
 
 The handler logs with `log/slog`, with the `Logger` of the options, or `slog.Default()`, and with the context of the request, so that a handler of `slog` can add e.g. the ID of its trace:
 
 * **Errors of the hooks** of the routes, e.g. of `PreCreate` or `PostListItem`, which are `500` responses, at the error level.
 * **A relation path** of `AllowedFilters` that cannot be used, once, as a warning, see [Route](#route).
-* **An invalid ID** in a URL, at the debug level.
-* **Every request**, with `AccessLog`, at the info level: the `method`, the `route`, e.g. `notes`, the `path`, the `status` and the `size` of the response, and the `duration`.
+* **An invalid ID** in a URL, a request that is not [authenticated](#authentication), and a request over the [rate limit](#rate-limits), at the debug level.
+* **An error of the rate limiter**, e.g. of its Redis, at the error level.
+* **Every request**, with `AccessLog`, at the info level: the `method`, the `route`, e.g. `notes`, the `path`, the `client`, its IP, see [Client IPs](#client-ips), the `status` and the `size` of the response, and the `duration`.
 
-The errors of the queries are logged by the [registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/pkgs/registry.md#logging): at the error level for the errors of the database, which are `500` responses, and at the debug level for the errors of a request, e.g. a validation error, which are `400`, `404` and `409` responses. They are not logged again by the handler. Set the logger of the registry with `WithLogger`:
+The errors of the queries are logged by the [registry](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/pkgs/registry.md#logging): at the error level for the errors of the database, which are `500` responses, and at the debug level for the errors of a request, e.g. a validation error, which are `400`, `404` and `409` responses. They are not logged again by the handler. Set the logger of the registry with `WithLogger`:
 
 ```go
 logger := slog.New(gorestapi.LogHandler(slog.NewJSONHandler(os.Stderr, nil)))
@@ -316,14 +489,14 @@ handler := gorestapi.New(reg, gorestapi.Options{Routes: routes, Logger: logger, 
 **Request IDs.** Every request has an ID, from its `X-Request-ID` header, e.g. of a proxy or of the client, or a new one when it has none, or one of other characters than letters, digits, `.`, `_` and `-`, or longer than 128 characters, which could change the lines of the logs. The response has it in its `X-Request-ID` header, and `gorestapi.RequestID(ctx)` returns it in the hooks, e.g. for the logs of your application. `gorestapi.LogHandler` wraps a handler of `slog`, and adds the `request_id` attribute to all the records that are logged with the context of a request, by the handler, by the registry and by your code, as above, and the `trace_id` and `span_id` of its span, when OpenTelemetry records it, see [Traces and metrics](#traces-and-metrics):
 
 ```json
-{"time":"...","level":"INFO","msg":"request","hand":"github.com/mikogs/gorestapi.Handler","method":"GET","route":"notes","path":"/api/notes/42","status":404,"size":164,"duration":461633,"request_id":"req-1","trace_id":"e78a1928ca73364072ba62df3c5d508f","span_id":"a6983d5ea2195040"}
+{"time":"...","level":"INFO","msg":"request","hand":"github.com/mikogs/gorestapi.Handler","method":"GET","route":"notes","path":"/api/notes/42","client":"203.0.113.7","status":404,"size":164,"duration":461633,"request_id":"req-1","trace_id":"e78a1928ca73364072ba62df3c5d508f","span_id":"a6983d5ea2195040"}
 ```
 
 ## Traces and metrics
 
 The handler is instrumented with [OpenTelemetry](https://opentelemetry.io/docs/languages/go/), by its [semantic conventions of HTTP servers](https://opentelemetry.io/docs/specs/semconv/http/http-spans/). It depends only on the API of OpenTelemetry, which records nothing, at almost no cost, until the application sets an SDK, and the SDK chooses where the spans and the metrics go, e.g. Prometheus, an OTLP collector, Jaeger or a vendor:
 
-* **A span of each request**, of the kind server, named by its method and its route, e.g. `GET /notes/{id}`, as the path has the IDs. A method that is not of HTTP is named `HTTP`, so that clients cannot add names. The span has the attributes `http.request.method`, `http.route`, `url.path`, `url.scheme`, `user_agent.original` and `http.response.status_code`. A response of `5xx` has the status `Error`, and the attribute `error.type`, e.g. `500`. The spans of the queries of the [gocrud hook](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/crud/init.md#opentelemetry) are its children.
+* **A span of each request**, of the kind server, named by its method and its route, e.g. `GET /notes/{id}`, as the path has the IDs. A method that is not of HTTP is named `HTTP`, so that clients cannot add names. The span has the attributes `http.request.method`, `http.route`, `url.path`, `url.scheme`, `user_agent.original` and `http.response.status_code`. A response of `5xx` has the status `Error`, and the attribute `error.type`, e.g. `500`. The spans of the queries of the [gocrud hook](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/crud/init.md#opentelemetry) are its children.
 * **The trace context** of a request, e.g. the `traceparent` header of a gateway, makes its span a child of the span of the caller, with the global propagator of `otel.SetTextMapPropagator`, e.g. `propagation.TraceContext{}`. Without one, the propagator of OpenTelemetry reads nothing.
 * **The histogram `http.server.request.duration`**, in seconds, by `http.request.method`, `http.route`, `http.response.status_code`, `url.scheme` and `error.type`. The route is `/{path}/` or `/{path}/{id}`, without the prefix of the mount, e.g. `/notes/{id}`.
 * **The providers** are the global ones, of `otel.SetTracerProvider` and `otel.SetMeterProvider`, or the `TracerProvider` and `MeterProvider` of the options.
@@ -392,11 +565,12 @@ mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
   * the types of the fields, e.g. `date-time` for `time.Time`, `uuid` for a UUID ID, and `nullable` for a pointer,
   * the rules of the `validate` tags, e.g. `required`, `min` and `max`, `email`, and `oneof` as an `enum`, and the `crud_regexp` tag as a `pattern`,
   * the password fields as `writeOnly`, as they are never returned,
-  * the `ID`, and the [creation and modification fields](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#4-creation-and-modification-fields), as `readOnly`, as the server sets them,
+  * the `ID`, and the [creation and modification fields](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/struct.md#4-creation-and-modification-fields), as `readOnly`, as the server sets them,
   * the relation fields as `readOnly` references to the schemas of the related structs, as they are not saved with a record.
-* **The responses** are the successful responses, and the [problems](#errors) of each operation, by status, with their codes.
+* **The responses** are the successful responses, and the [problems](#errors) of each operation, by status, with their codes, also `413` and `415` of the bodies, `429` with `RateLimiter`, and `401` with `Authenticate`.
+* **The security**, with `Authenticate`, is the scheme `bearerAuth` of the bearer tokens, of every operation, and optional for the routes with `Anonymous`. `BearerFormat` of `OpenAPIInfo`, e.g. `JWT`, tells the clients the format of the tokens. For other credentials, e.g. cookies, change the `securitySchemes` of the document, e.g. by decoding and encoding it again, when you publish it.
 
-The document does not describe the authentication, which is not part of the handler: add its `securitySchemes` to the document, e.g. by decoding and encoding it again, when you publish it. A page of [Swagger UI](https://github.com/swagger-api/swagger-ui) shows the document, and sends requests to the API, e.g. `/docs` of the [demo](demo.md).
+A page of [Swagger UI](https://github.com/swagger-api/swagger-ui) shows the document, and sends requests to the API, e.g. `/docs` of the [demo](demo.md).
 
 ## Versions
 
@@ -426,7 +600,7 @@ srv := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 10 * time.Se
 log.Fatal(srv.ListenAndServe())
 ```
 
-After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional record ID: a number, or a UUID for structs with a `string` ID, see [The ID Field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#1-the-id-field).
+After stripping the mount prefix the handler expects URLs of the form `/{path}/{id}` where `path` is a key from `Options.Routes` and `id` is an optional record ID: a number, or a UUID for structs with a `string` ID, see [The ID Field](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/struct.md#1-the-id-field).
 
 ## URL scheme
 
@@ -471,9 +645,9 @@ Returns a paginated, filtered list of records.
 | `filter_val_{Field}` | string | — | Filter value for the named field |
 | `filter_op_{Field}` | string | `eq` | Filter operator for the named field: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `like`, `match` (PostgreSQL only, with the flag `EnableMatchFilters`), `bit` or `in` |
 
-Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`, up to [`MaxInValues`](#options). Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud registry](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/pkgs/registry.md) for the details.
+Values are converted to the type of the field. For `in`, the values are separated with commas, e.g. `filter_val_Status=paid,shipped&filter_op_Status=in`, up to [`MaxInValues`](#options). Times can be written as e.g. `2024-05-01` or `2024-05-01T10:30:00Z`. For a nullable (pointer) field, an empty value is `NULL`: `filter_val_ShippedAt=&filter_op_ShippedAt=eq` lists the records without a value. See the [gocrud registry](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/pkgs/registry.md) for the details.
 
-**Filters on related records.** A field can be a path through relation fields, e.g. `filter_val_Customer.Country=PL` for the orders of customers from Poland, or `filter_val_Items.Product=Mouse` for the orders with such an item, when the path is listed in [`AllowedFilters`](#route), and clients can read its value through a route of the related records. See [Conditions on related records](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/crud/ops.md#conditions-on-related-records) for the details.
+**Filters on related records.** A field can be a path through relation fields, e.g. `filter_val_Customer.Country=PL` for the orders of customers from Poland, or `filter_val_Items.Product=Mouse` for the orders with such an item, when the path is listed in [`AllowedFilters`](#route), and clients can read its value through a route of the related records. See [Conditions on related records](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/crud/ops.md#conditions-on-related-records) for the details.
 
 **Filter groups.** The filters are joined with AND. To join filters with OR, put them in a group, by adding the same name of letters, digits or underscores after the field name and a tilde, e.g. `q` in `filter_val_Title~q` and `filter_op_Title~q`. The filters of a group are joined with OR, and the group with AND with the other filters and groups.
 
@@ -499,7 +673,7 @@ An invalid filter is a `400 VALIDATION_FAILED` problem, with the failed rules in
 
 When no records match, `data` is an empty list, `[]`.
 
-**Pages with cursors.** A full page, with `limit` records, has the cursor of the next page in `meta.next`. Pass it as `after`, with the same `limit`, `order`, `order_direction` and filters, to get the records after the last one of the page, e.g. `GET /notes/?limit=20&order=CreatedAt&order_direction=desc&after=eyJv...`. Unlike `offset`, the database reads only the records of the page, also of the last pages of a large table, and no record is missed or repeated when records are added or deleted while the client reads the pages. The page after the last one is empty. See [Pages with cursors](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/crud/ops.md#pages-with-cursors) for the details.
+**Pages with cursors.** A full page, with `limit` records, has the cursor of the next page in `meta.next`. Pass it as `after`, with the same `limit`, `order`, `order_direction` and filters, to get the records after the last one of the page, e.g. `GET /notes/?limit=20&order=CreatedAt&order_direction=desc&after=eyJv...`. Unlike `offset`, the database reads only the records of the page, also of the last pages of a large table, and no record is missed or repeated when records are added or deleted while the client reads the pages. The page after the last one is empty. See [Pages with cursors](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/crud/ops.md#pages-with-cursors) for the details.
 
 * A cursor of another order, or a string that is not a cursor, is a `400 VALIDATION_FAILED` problem with `{"after": "type"}` in `errors`, and so is `after` with `offset`.
 * An `order` of a nullable field cannot be in a cursor, so its pages have no `meta.next`, and are read with `offset`.
@@ -544,7 +718,7 @@ Creates a new record. The request body must be a JSON object whose keys match th
 
 For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4d-2e5f6a7b8c9d"`.
 
-**Response `400 Bad Request`** (validation failure). `errors` maps the fields that failed to the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#validation-errors):
+**Response `400 Bad Request`** (validation failure). `errors` maps the fields that failed to the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/struct.md#validation-errors):
 ```json
 {
   "type": "about:blank",
@@ -557,9 +731,9 @@ For a struct with a `string` ID, `id` is the UUID, e.g. `"0190f5c3-6d1e-7b3a-9c4
 }
 ```
 
-**Response `403 Forbidden`:** the problem `FORBIDDEN` of `AllowCreate`. **Response `400 Bad Request`:** also the problem `UNMARSHAL_REQUEST`, of a body that is not a JSON object of the record.
+**Response `403 Forbidden`:** the problem `FORBIDDEN` of `AllowCreate`. **Response `400 Bad Request`:** also the problem `UNMARSHAL_REQUEST`, of a body that is not a JSON object of the record, and `VALIDATION_FAILED` with e.g. `{"Titel": "unknown"}` in `errors`, of a field that the record does not have. **Responses `413` and `415`:** the problems `REQUEST_TOO_LARGE` and `UNSUPPORTED_MEDIA_TYPE`, see [Request bodies](#request-bodies).
 
-**Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist, and `VERSION_CONFLICT` when the record has a [version field](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#10-version) and the body has a version other than the stored one, as the record was changed since the client read it. A body without the version is saved with the version that was read, so only a client that sends the version it read is protected from overwriting another change.
+**Response `409 Conflict`**: `UNIQUE_VIOLATION` when a unique field already has the value, `FOREIGN_KEY_VIOLATION` when the record references a record that does not exist, and `VERSION_CONFLICT` when the record has a [version field](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/struct.md#10-version) and the body has a version other than the stored one, as the record was changed since the client read it. A body without the version is saved with the version that was read, so only a client that sends the version it read is protected from overwriting another change.
 
 ---
 
@@ -631,7 +805,7 @@ An error is a problem of [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457), Pro
 | `detail` | string | What went wrong in this request, for a developer. It does not name internal fields, and the details of an error of the server are only in its logs |
 | `instance` | string | The path of the request, as the client sent it, also when the handler is mounted with `http.StripPrefix` |
 | `code` | string | The code of the problem, see below. Clients switch on it, as it is the same with every `ProblemTypeBaseURL` |
-| `errors` | object? | Present on `VALIDATION_FAILED`: the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/v1.0.0-rc.2/docs/struct.md#validation-errors) of the fields, e.g. `{"Email": "email"}`, or of the parameters of a list, e.g. `{"filters": "max"}` |
+| `errors` | object? | Present on `VALIDATION_FAILED`: the names of the failed [validation rules](https://github.com/mikogs/gocrud/blob/v1.0.0/docs/struct.md#validation-errors) of the fields, e.g. `{"Email": "email"}`, or of the parameters of a list, e.g. `{"filters": "max"}` |
 
 **Types.** With `ProblemTypeBaseURL`, e.g. `https://api.example.com/problems/`, each problem has a type of its own, the base URL followed by the code in lower case, with `-` instead of `_`, e.g. `https://api.example.com/problems/unique-violation`, and the title of the problem:
 
@@ -654,17 +828,21 @@ The URIs identify the problems, so keep them the same once clients use them. The
 |---|---|---|---|---|
 | `URL_PATH_ID` | 400 | Invalid ID | `url-path-id` | The part of the URL after the route is not a single segment of letters, digits, `-` and `_` |
 | `UNMARSHAL_REQUEST` | 400 | Invalid request body | `unmarshal-request` | The body of a create or an update is not a JSON object of the record |
-| `VALIDATION_FAILED` | 400 | Validation failed | `validation-failed` | The record, a filter, the order or the cursor of a list is invalid, see `errors` |
+| `VALIDATION_FAILED` | 400 | Validation failed | `validation-failed` | The record, a filter, the order or the cursor of a list is invalid, or the body has a field that the record does not have, see `errors` |
+| `UNAUTHORIZED` | 401 | Unauthorized | `unauthorized` | The request has no valid credentials, see [Authentication](#authentication). The `WWW-Authenticate` header has the scheme |
 | `FORBIDDEN` | 403 | Forbidden | `forbidden` | An `Allow*` hook rejected the request |
 | `NOT_FOUND` | 404 | Not found | `not-found` | No record with the ID, or no route for the URL |
 | `NOT_ALLOWED` | 405 | Method not allowed | `not-allowed` | The method is not supported for the URL, e.g. `PATCH`, or `DELETE` of a list, or it is disabled for the route with `Flags`. The `Allow` header has the methods that are allowed |
 | `UNIQUE_VIOLATION` | 409 | Unique violation | `unique-violation` | A unique field already has the value |
 | `FOREIGN_KEY_VIOLATION` | 409 | Foreign key violation | `foreign-key-violation` | The record references a record that does not exist, or a deleted record is referenced by other records |
 | `VERSION_CONFLICT` | 409 | Version conflict | `version-conflict` | The record was changed since the client read it, see its version field |
+| `REQUEST_TOO_LARGE` | 413 | Request too large | `request-too-large` | The body is larger than `MaxBodyBytes`, see [Request bodies](#request-bodies) |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | Unsupported media type | `unsupported-media-type` | The body is not of a JSON content type |
+| `TOO_MANY_REQUESTS` | 429 | Too many requests | `too-many-requests` | The client is over its [rate limit](#rate-limits). The `Retry-After` header has the seconds until the next request |
 | `SERVICE_ERROR` | 500 | Service error | `service-error` | An error of the database, or of a `Pre*` or `Post*` hook, which is logged |
 | `SERVICE_UNAVAILABLE` | 503 | Service unavailable | `service-unavailable` | The check of a [readiness probe](#health-checks) failed |
 
-The codes are constants in Go, e.g. `jsonresp.CodeValidationFailed`, `jsonresp.CodeNotFound` and `gorestapi.CodeForbidden`, for clients and tests in Go. The handlers of your application, e.g. of a login, can respond with the same problems with `jsonresp.WriteProblem`:
+The codes are constants in Go, e.g. `jsonresp.CodeValidationFailed`, `jsonresp.CodeNotFound`, `gorestapi.CodeForbidden` and `gorestapi.CodeUnauthorized`, for clients and tests in Go. The handlers of your application, e.g. of a login, can respond with the same problems with `jsonresp.WriteProblem`:
 
 ```go
 jsonresp.WriteProblem(w, &jsonresp.Problem{
@@ -677,24 +855,3 @@ jsonresp.WriteProblem(w, &jsonresp.Problem{
 })
 ```
 
-## CORS
-
-Populate `Options.CORS` to emit CORS headers on every response:
-
-```go
-import (
-    "github.com/mikogs/gorestapi"
-    "github.com/mikogs/gorestapi/pkg/cors"
-)
-
-handler := gorestapi.New(reg, gorestapi.Options{
-    CORS: cors.CORS{
-        AllowOrigin:  "https://app.example.com",
-        AllowHeaders: "Content-Type, Authorization",
-        AllowMethods: "GET, PUT, DELETE",
-        MaxAge:       3600,
-    },
-})
-```
-
-Each header is written only when its field is set. Set `AllowCredentials: true` to emit `Access-Control-Allow-Credentials: true`. Leave `CORS` as its zero value to emit no CORS headers. `OPTIONS` requests to any path are answered with `204 No Content` and the CORS headers.

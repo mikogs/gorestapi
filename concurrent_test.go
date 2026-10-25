@@ -20,7 +20,9 @@ func request(h *Handler, method string, path string, body any) (int, jsonresp.Re
 		data, _ = json.Marshal(body)
 	}
 	w := httptest.NewRecorder()
-	h.Serve(w, httptest.NewRequest(method, path, bytes.NewReader(data)))
+	req := httptest.NewRequest(method, path, bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	h.Serve(w, req)
 
 	var resp jsonresp.Response
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -50,7 +52,7 @@ func TestServe_Concurrent(t *testing.T) {
 
 // concurrentRequests creates, reads, lists, updates and deletes an order.
 func concurrentRequests(h *Handler) error {
-	code, resp, err := request(h, http.MethodPut, "/orders/", map[string]any{"CustomerID": 1, "Status": "new"})
+	code, resp, err := request(h, http.MethodPut, "/orders/", map[string]any{"customer_id": 1, "status": "new"})
 	if err != nil || code != http.StatusCreated {
 		return fmt.Errorf("create returned %d %+v, %w", code, resp, err)
 	}
@@ -64,7 +66,7 @@ func concurrentRequests(h *Handler) error {
 		{http.MethodGet, path, nil},
 		{http.MethodGet, "/orders/?filter_val_Customer.Name=Acme&order=Customer.Name&order_direction=desc", nil},
 		{http.MethodGet, "/orders/?filter_val_Customer.Email=acme@example.com&filter_val_Status~q=new&filter_val_Customer.Orders.Status~q=paid", nil},
-		{http.MethodPut, path, map[string]any{"CustomerID": 1, "Status": "paid"}},
+		{http.MethodPut, path, map[string]any{"customer_id": 1, "status": "paid"}},
 		{http.MethodDelete, path, nil},
 	} {
 		if code, resp, err := request(h, step.method, step.path, step.body); err != nil || code != http.StatusOK {

@@ -28,6 +28,7 @@ func TestServe_DisableCreate(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableCreate})
 
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", nil)
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 
@@ -41,6 +42,7 @@ func TestServe_DisableUpdate(t *testing.T) {
 	h := handlerWith(Route{Flags: DisableUpdate})
 
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/1", nil)
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.Serve(w, req)
 

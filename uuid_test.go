@@ -50,6 +50,7 @@ func serveTicket(t *testing.T, h *Handler, method string, path string, body any)
 
 	data, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User", "auth0|42")
 	w := httptest.NewRecorder()
 	h.Serve(w, req)

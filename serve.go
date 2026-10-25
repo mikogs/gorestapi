@@ -33,12 +33,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	h.options.CORS.WriteHeaders(w)
-
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
+	h.writeSecurityHeaders(w)
 
 	foundURLPath, foundRoute := h.findRoute(r)
 
@@ -54,6 +49,22 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		h.log().LogAttrs(ctx, slog.LevelDebug, "invalid ID in the URL", handlerAttr, slog.String("path", r.URL.Path))
 		h.writeProblem(w, r, jsonresp.CodeURLPathID, "", nil)
+		return
+	}
+
+	// the preflights of CORS are answered by a middleware of CORS in front of the handler, see the docs
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Allow", strings.Join(allowedMethods(foundRoute, id), ", "))
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	ctx, authenticated := h.authenticate(ctx, w, r, foundRoute)
+	if !authenticated {
+		return
+	}
+	r = r.WithContext(ctx)
+	if !h.rateLimit(ctx, w, r) {
 		return
 	}
 
@@ -107,6 +118,12 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 // writeNotAllowed writes the problem of a method that the route does not allow for the URL, with the methods that it
 // allows in the Allow header, as HTTP requires.
 func (h *Handler) writeNotAllowed(w http.ResponseWriter, r *http.Request, route Route, id string) {
+	w.Header().Set("Allow", strings.Join(allowedMethods(route, id), ", "))
+	h.writeProblem(w, r, CodeNotAllowed, "", nil)
+}
+
+// allowedMethods returns the methods that route allows for the URL of a list, or of a record when id is set.
+func allowedMethods(route Route, id string) []string {
 	methods := []string{http.MethodOptions}
 	if id == "" {
 		if route.Flags&DisableList == 0 {
@@ -126,8 +143,7 @@ func (h *Handler) writeNotAllowed(w http.ResponseWriter, r *http.Request, route 
 			methods = append(methods, http.MethodDelete)
 		}
 	}
-	w.Header().Set("Allow", strings.Join(methods, ", "))
-	h.writeProblem(w, r, CodeNotAllowed, "", nil)
+	return methods
 }
 
 // RoutePath returns the path of the route of r, a key of Options.Routes, e.g. "notes" for /notes/42, or an empty

@@ -228,6 +228,7 @@ func TestAPI_Read_NoPasswordField_UnaffectedResponse(t *testing.T) {
 	})
 	_, h := passStructService()
 	reqCreate := httptest.NewRequest(http.MethodPut, "/passstruct/", bytes.NewReader(body))
+	reqCreate.Header.Set("Content-Type", "application/json")
 	wCreate := httptest.NewRecorder()
 	h.Serve(wCreate, reqCreate)
 	if wCreate.Code != http.StatusCreated {

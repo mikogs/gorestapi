@@ -42,8 +42,20 @@ func (h *Handler) handleAPICreateUpdate(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	err = jsonreq.Unmarshal(r, &obj)
-	if err != nil {
+	err = jsonreq.Decode(w, r, &obj, jsonreq.Options{MaxBytes: h.options.MaxBodyBytes, AllowUnknownFields: h.options.AllowUnknownFields})
+	var unknownField *jsonreq.UnknownFieldError
+	switch {
+	case errors.Is(err, jsonreq.ErrContentType):
+		h.writeProblem(w, r, jsonresp.CodeUnsupportedMediaType, "", nil)
+		return
+	case errors.Is(err, jsonreq.ErrTooLarge):
+		h.writeProblem(w, r, jsonresp.CodeRequestTooLarge, "", nil)
+		return
+	case errors.As(err, &unknownField):
+		h.writeProblem(w, r, jsonresp.CodeValidationFailed, "The body has a field that the record does not have, see errors.",
+			map[string]string{unknownField.Field: "unknown"})
+		return
+	case err != nil:
 		h.writeProblem(w, r, jsonresp.CodeUnmarshalRequest, "", nil)
 		return
 	}

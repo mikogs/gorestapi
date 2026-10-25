@@ -17,6 +17,7 @@ func TestServe_CreateUpdate(t *testing.T) {
 	objJSON := fixtures.TestStructJSON()
 
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(objJSON))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	testHandler.Serve(w, req)
@@ -68,6 +69,7 @@ func TestServe_CreateUpdate(t *testing.T) {
 	objSaved.FirstName = "Updated"
 	updateJSON, _ := json.Marshal(objSaved) // #nosec G117 -- test data, with the password of a test
 	req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", idInt), bytes.NewReader(updateJSON))
+	req.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 
 	testHandler.Serve(w, req)

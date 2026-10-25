@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"reflect"
 	"regexp"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mikogs/gocrud/pkg/registry"
-	"github.com/mikogs/gorestapi/pkg/cors"
 )
 
 const (
@@ -69,6 +69,10 @@ type Route struct {
 	// List returns are allowed, i.e. not the password fields and the fields with a json:"-" tag, and no paths. The
 	// order can be a field that List returns, or one of AllowedFilters.
 	AllowedFilters []string
+	// Anonymous serves the requests of the route without credentials, with no Principal, when Options.Authenticate
+	// returns ErrNoCredentials, e.g. for the public records of a catalog. Requests with credentials that are not valid
+	// are still the problem UNAUTHORIZED.
+	Anonymous bool
 
 	// Allow hooks — called with the object and request; return non-nil to reject
 	// with 403. AllowUpdate receives the loaded record before the request body is
@@ -114,7 +118,37 @@ type Route struct {
 }
 
 type Options struct {
-	CORS cors.CORS
+	// Authenticate returns the principal of a request, e.g. the claims of its token, which the hooks and UserIDFunc
+	// get with Principal(r.Context()), or an error, which is the problem UNAUTHORIZED, e.g. ErrNoCredentials for a
+	// request without credentials, see Bearer. It is called with every request of a route, except OPTIONS, before its
+	// operation. When it is nil, the requests are not authenticated.
+	Authenticate func(r *http.Request) (any, error)
+	// RateLimiter limits the requests of each client, after they are authenticated, e.g. NewRateLimiter(10, 20). A
+	// request over the limit is the problem TOO_MANY_REQUESTS. It is nil for no limit.
+	RateLimiter RateLimiter
+	// RateLimitKey returns the key of the limit of a request, e.g. the user of its Principal, or ClientIPKey of its
+	// ClientIP, which is the key when it is nil.
+	RateLimitKey func(r *http.Request) string
+	// TrustedProxies are the networks of the proxies in front of the API, e.g. of its load balancer, whose
+	// X-Forwarded-For header has the IP of the client, see ClientIP.
+	TrustedProxies []netip.Prefix
+	// DisableSecurityHeaders leaves out the headers of security of the responses: X-Content-Type-Options: nosniff,
+	// X-Frame-Options: DENY, Content-Security-Policy: default-src 'none'; frame-ancestors 'none', Referrer-Policy:
+	// no-referrer and Cache-Control, e.g. when a proxy in front of the API sets them.
+	DisableSecurityHeaders bool
+	// CacheControl is the Cache-Control header of the responses, no-store when it is empty, so that the records of a
+	// user are not kept by browsers and proxies. Set it e.g. to "public, max-age=60" for an API of public data.
+	CacheControl string
+	// HSTSMaxAge sends the Strict-Transport-Security header, with includeSubDomains, so that browsers use only HTTPS
+	// for the domain for this long, e.g. a year. It is not sent when it is 0, e.g. when the proxy that ends TLS sends
+	// it, as it should be sent only over HTTPS.
+	HSTSMaxAge time.Duration
+	// MaxBodyBytes is the largest body of a create or an update, jsonreq.DefaultMaxBytes (1 MiB) when it is 0, and no
+	// limit when it is negative. A larger body is the problem REQUEST_TOO_LARGE.
+	MaxBodyBytes int64
+	// AllowUnknownFields ignores the fields of the body of a create or an update that the struct does not have,
+	// instead of the problem VALIDATION_FAILED, e.g. for clients that send the fields of a newer version.
+	AllowUnknownFields bool
 	// ProblemTypeBaseURL is the beginning of the type URIs of the problems of the error responses, e.g.
 	// https://api.example.com/problems/, followed by the code of the problem, e.g. unique-violation. When it is empty,
 	// the type of all the problems is about:blank, and their code tells them apart.

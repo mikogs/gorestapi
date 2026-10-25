@@ -111,6 +111,7 @@ func (h *Handler) logAccess(r *http.Request, recorder *responseRecorder, start t
 		slog.String("method", r.Method),
 		slog.String("route", h.RoutePath(r)),
 		slog.String("path", requestPath(r)),
+		slog.String("client", ClientIP(r, h.options.TrustedProxies).String()),
 		slog.Int("status", recorder.statusOrOK()),
 		slog.Int("size", recorder.size),
 		slog.Duration("duration", time.Since(start)),

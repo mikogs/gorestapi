@@ -16,17 +16,21 @@ type problemType struct {
 }
 
 var problemTypes = map[string]problemType{
-	jsonresp.CodeURLPathID:           {http.StatusBadRequest, "Invalid ID", "The part of the URL after the route is not an ID."},
-	jsonresp.CodeUnmarshalRequest:    {http.StatusBadRequest, "Invalid request body", "The request body is not a JSON object of the record."},
-	jsonresp.CodeValidationFailed:    {http.StatusBadRequest, "Validation failed", "The request has invalid values, see errors."},
-	CodeForbidden:                    {http.StatusForbidden, "Forbidden", "The operation is not allowed for the client."},
-	jsonresp.CodeNotFound:            {http.StatusNotFound, "Not found", "There is no record with the ID."},
-	CodeNotAllowed:                   {http.StatusMethodNotAllowed, "Method not allowed", "The method is not allowed for the URL, see the Allow header."},
-	jsonresp.CodeUniqueViolation:     {http.StatusConflict, "Unique violation", "A unique field already has the value in another record."},
-	jsonresp.CodeForeignKeyViolation: {http.StatusConflict, "Foreign key violation", "The record references a record that does not exist."},
-	jsonresp.CodeVersionConflict:     {http.StatusConflict, "Version conflict", "The record was changed since the client read it."},
-	CodeServiceError:                 {http.StatusInternalServerError, "Service error", "The request failed on the server."},
-	CodeServiceUnavailable:           {http.StatusServiceUnavailable, "Service unavailable", "The service cannot serve requests yet, e.g. without its database."},
+	jsonresp.CodeURLPathID:            {http.StatusBadRequest, "Invalid ID", "The part of the URL after the route is not an ID."},
+	jsonresp.CodeUnmarshalRequest:     {http.StatusBadRequest, "Invalid request body", "The request body is not a JSON object of the record."},
+	jsonresp.CodeValidationFailed:     {http.StatusBadRequest, "Validation failed", "The request has invalid values, see errors."},
+	jsonresp.CodeRequestTooLarge:      {http.StatusRequestEntityTooLarge, "Request too large", "The request body is larger than the limit of the API."},
+	jsonresp.CodeUnsupportedMediaType: {http.StatusUnsupportedMediaType, "Unsupported media type", "The request body is not JSON, see its Content-Type."},
+	CodeUnauthorized:                  {http.StatusUnauthorized, "Unauthorized", "The request has no valid credentials."},
+	CodeForbidden:                     {http.StatusForbidden, "Forbidden", "The operation is not allowed for the client."},
+	jsonresp.CodeNotFound:             {http.StatusNotFound, "Not found", "There is no record with the ID."},
+	CodeNotAllowed:                    {http.StatusMethodNotAllowed, "Method not allowed", "The method is not allowed for the URL, see the Allow header."},
+	CodeTooManyRequests:               {http.StatusTooManyRequests, "Too many requests", "The client sent more requests than the limit of the API, see the Retry-After header."},
+	jsonresp.CodeUniqueViolation:      {http.StatusConflict, "Unique violation", "A unique field already has the value in another record."},
+	jsonresp.CodeForeignKeyViolation:  {http.StatusConflict, "Foreign key violation", "The record references a record that does not exist."},
+	jsonresp.CodeVersionConflict:      {http.StatusConflict, "Version conflict", "The record was changed since the client read it."},
+	CodeServiceError:                  {http.StatusInternalServerError, "Service error", "The request failed on the server."},
+	CodeServiceUnavailable:            {http.StatusServiceUnavailable, "Service unavailable", "The service cannot serve requests yet, e.g. without its database."},
 }
 
 // writeProblem writes the problem of code, with the detail of its type when detail is empty, and the violations of the

@@ -16,6 +16,8 @@ import (
 	"github.com/mikogs/gocrud/otelhook"
 	"github.com/mikogs/gocrud/pkg/registry"
 	"github.com/mikogs/gorestapi"
+	"github.com/mikogs/gorestapi/pkg/jwtauth"
+	"github.com/rs/cors"
 	_ "modernc.org/sqlite"
 )
 
@@ -23,6 +25,7 @@ type User struct {
 	ID         uint64
 	Name       string `validate:"required,max=100"`
 	Email      string `validate:"required,email" crud:"uniq"`
+	Password   string `validate:"required,min=8,max=72" crud:"pass"`
 	CreatedAt  time.Time
 	CreatedBy  uint64
 	ModifiedAt time.Time
@@ -89,42 +92,72 @@ func main() {
 		os.Exit(1)
 	}
 
-	// X-User-ID is intentionally simple — a real app would use JWT or sessions.
-	userIDFromRequest := func(r *http.Request) any {
-		id, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
-		return id
+	// the key of the tokens is new at every start, so that the demo needs no secrets, and its tokens are valid until it
+	// stops; a real application loads it, e.g. with jwtauth.ParsePrivateKeyPEM
+	signingKey, err := jwtauth.GenerateKey()
+	if err != nil {
+		slog.Error("failed to generate the key of the tokens", "error", err)
+		os.Exit(1)
+	}
+	provider, err := jwtauth.NewProvider("http://localhost:"+port, signingKey)
+	if err != nil {
+		slog.Error("failed to create the provider of the tokens", "error", err)
+		os.Exit(1)
 	}
 
-	// noteComment stamps every create and update with a server-controlled comment.
-	noteComment := func(obj any, _ *http.Request) error {
-		obj.(*Note).Comment = "Added with API"
+	userIDFromRequest := func(r *http.Request) any {
+		return userID(r)
+	}
+
+	// noteSave stamps every create and update with a server-controlled comment, and with the user of the token, so that
+	// a note cannot be given to another user.
+	noteSave := func(obj any, r *http.Request) error {
+		note := obj.(*Note)
+		note.Comment = "Added with API"
+		note.UserID = userID(r)
 		return nil
 	}
 
-	// noteOwner rejects requests where X-User-ID does not match the note's UserID.
+	// noteOwner rejects the requests of other users than the owner of the note.
 	noteOwner := func(obj any, r *http.Request) error {
-		note := obj.(*Note)
-		headerUserID, _ := strconv.ParseUint(r.Header.Get("X-User-ID"), 10, 64)
-		if note.UserID != headerUserID {
+		if obj.(*Note).UserID != userID(r) {
 			return errors.New("not the note owner")
 		}
 		return nil
 	}
 
+	// a user can see, change or delete only themselves, so that the e-mails are not public
+	self := func(obj any, r *http.Request) error {
+		if obj.(*User).ID != userID(r) {
+			return errors.New("not the user")
+		}
+		return nil
+	}
+	selfOnly := func(r *http.Request) gorestapi.FilterSet {
+		return gorestapi.FilterSet{Vals: map[string]string{"ID": strconv.FormatUint(userID(r), 10)}}
+	}
+
+	ownNotes := func(r *http.Request) gorestapi.FilterSet {
+		return gorestapi.FilterSet{Vals: map[string]string{"UserID": strconv.FormatUint(userID(r), 10)}}
+	}
+
 	handler := gorestapi.New(reg, gorestapi.Options{
-		UserIDFunc: userIDFromRequest,
-		Logger:     logger,
-		AccessLog:  true,
+		UserIDFunc:   userIDFromRequest,
+		Authenticate: authenticate(provider),
+		// 10 requests a second of each client, with bursts of 20
+		RateLimiter: gorestapi.NewRateLimiter(10, 20),
+		Logger:      logger,
+		AccessLog:   true,
 		Routes: map[string]gorestapi.Route{
 			// The audit fields (CreatedAt, CreatedBy, ModifiedAt, ModifiedBy) are set by gocrud,
-			// which ignores the values sent by clients.
-			"users": {},
+			// which ignores the values sent by clients. Anyone can sign up, without a token.
+			"users": {Anonymous: true, AllowUpdate: self, AllowDelete: self, FilterList: selfOnly, FilterRead: selfOnly},
 			"notes": {
 				AllowedFilters: []string{"UserID"},
 				AllowUpdate:    noteOwner,
 				AllowDelete:    noteOwner,
-				PreCreate:      noteComment,
-				PreUpdate:      noteComment,
+				PreCreate:      noteSave,
+				PreUpdate:      noteSave,
 				PostRead: func(obj any, _ *http.Request) error {
 					obj.(*Note).Comment = "Returned from gocrud"
 					return nil
@@ -133,27 +166,34 @@ func main() {
 					obj.(*Note).Comment = "Returned from gocrud"
 					return nil
 				},
-				FilterList: func(r *http.Request) gorestapi.FilterSet {
-					return gorestapi.FilterSet{
-						Vals: map[string]string{"UserID": r.Header.Get("X-User-ID")},
-					}
-				},
-				FilterRead: func(r *http.Request) gorestapi.FilterSet {
-					return gorestapi.FilterSet{
-						Vals: map[string]string{"UserID": r.Header.Get("X-User-ID")},
-					}
-				},
+				FilterList: ownNotes,
+				FilterRead: ownNotes,
 			},
 		},
 	})
 
+	// the browsers of the origin of CORS_ORIGIN, e.g. of a web app, can call the API, and read its headers
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:3000"
+	}
+	api := cors.New(cors.Options{
+		AllowedOrigins: []string{corsOrigin},
+		AllowedMethods: []string{http.MethodGet, http.MethodPut, http.MethodDelete},
+		AllowedHeaders: []string{"Authorization", "Content-Type", gorestapi.RequestIDHeader},
+		ExposedHeaders: []string{gorestapi.RequestIDHeader, "Allow", "Retry-After"},
+		MaxAge:         600,
+	}).Handler(http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
+
 	mux := http.NewServeMux()
-	mux.Handle("/api/", http.StripPrefix("/api", http.HandlerFunc(handler.Serve)))
+	mux.Handle("/api/", api)
+	// 1 login a second of each client, with bursts of 5, against guessing the passwords
+	mux.Handle("/token", tokenHandler(reg, provider, gorestapi.NewRateLimiter(1, 5)))
 	mux.HandleFunc("/healthz", gorestapi.Liveness)
 	mux.Handle("/readyz", handler.Readiness(db.PingContext))
 	mux.Handle("/metrics", metrics)
 
-	spec, err := handler.OpenAPI(gorestapi.OpenAPIInfo{Title: "gorestapi PoC", Version: "1.0.0", Servers: []string{"/api"}})
+	spec, err := handler.OpenAPI(gorestapi.OpenAPIInfo{Title: "gorestapi PoC", Version: "1.0.0", Servers: []string{"/api"}, BearerFormat: "JWT"})
 	if err != nil {
 		slog.Error("failed to generate the OpenAPI document", "error", err)
 		os.Exit(1)

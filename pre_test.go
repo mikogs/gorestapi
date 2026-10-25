@@ -24,6 +24,7 @@ func TestPreCreate_MutatesObject(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"Key": clientKey})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -60,6 +61,7 @@ func TestPreCreate_ErrorAbortsCreate(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"Key": "precreate-error-key-000000000000000"})
 	req := httptest.NewRequest(http.MethodPut, "/teststruct/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -86,6 +88,7 @@ func TestPreUpdate_MutatesObject(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"FirstName": "FromClient"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{
@@ -118,6 +121,7 @@ func TestPreUpdate_ErrorAbortsUpdate(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{"FirstName": "Updated"})
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/teststruct/%d", original.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	h := handlerWith(Route{

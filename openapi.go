@@ -21,6 +21,8 @@ type OpenAPIInfo struct {
 	Description string
 	// Servers are the URLs of the API, with the prefix of its mount, e.g. https://api.example.com/api or /api.
 	Servers []string
+	// BearerFormat is the format of the tokens of Options.Authenticate, e.g. JWT, a hint for the clients.
+	BearerFormat string
 }
 
 // OpenAPI returns the OpenAPI 3.0 document of the routes of the handler, as JSON: the operations that the routes allow,
@@ -38,6 +40,13 @@ func (h *Handler) OpenAPI(info OpenAPIInfo) ([]byte, error) {
 	}
 	for _, server := range info.Servers {
 		doc.Servers = append(doc.Servers, openAPIServer{URL: server})
+	}
+	// the tokens of the requests, which the handler reads only from the Authorization header, see Bearer
+	if h.options.Authenticate != nil {
+		doc.Components.SecuritySchemes = map[string]*openAPISecurityScheme{
+			"bearerAuth": {Type: "http", Scheme: "bearer", BearerFormat: info.BearerFormat},
+		}
+		doc.Security = []map[string][]string{{"bearerAuth": {}}}
 	}
 	schemas := &schemaBuilder{doc: doc, names: map[reflect.Type]string{}, reg: h.reg, passwords: map[reflect.Type][]string{}}
 
@@ -89,7 +98,8 @@ func (h *Handler) addRoute(doc *openAPIDocument, schemas *schemaBuilder, urlPath
 			RequestBody: jsonRequestBody(schemas.ref(reflect.TypeOf(obj))),
 			Responses: withProblems(map[string]*openAPIResponse{
 				"201": jsonResponse("The record is created, with the ID", dataSchema(idSchema(), false)),
-			}, doc, http.StatusBadRequest, http.StatusForbidden, http.StatusConflict, http.StatusInternalServerError),
+			}, doc, http.StatusBadRequest, http.StatusForbidden, http.StatusConflict, http.StatusRequestEntityTooLarge,
+				http.StatusUnsupportedMediaType, http.StatusInternalServerError),
 		}
 	}
 	if route.Flags&DisableRead == 0 {
@@ -108,7 +118,8 @@ func (h *Handler) addRoute(doc *openAPIDocument, schemas *schemaBuilder, urlPath
 			RequestBody: jsonRequestBody(schemas.ref(reflect.TypeOf(obj))),
 			Responses: withProblems(map[string]*openAPIResponse{
 				"200": jsonResponse("The record is updated", dataSchema(idSchema(), false)),
-			}, doc, http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusInternalServerError),
+			}, doc, http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict,
+				http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType, http.StatusInternalServerError),
 		}
 	}
 	if route.Flags&DisableDelete == 0 {
@@ -117,6 +128,22 @@ func (h *Handler) addRoute(doc *openAPIDocument, schemas *schemaBuilder, urlPath
 			Responses: withProblems(map[string]*openAPIResponse{
 				"200": jsonResponse("The record is deleted", dataSchema(nil, false)),
 			}, doc, http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusInternalServerError),
+		}
+	}
+	for _, operation := range []*openAPIOperation{collection.Get, collection.Put, record.Get, record.Put, record.Delete} {
+		if operation == nil {
+			continue
+		}
+		if h.options.RateLimiter != nil {
+			withProblems(operation.Responses, doc, http.StatusTooManyRequests)
+		}
+		if h.options.Authenticate == nil {
+			continue
+		}
+		withProblems(operation.Responses, doc, http.StatusUnauthorized)
+		// the requests of an anonymous route can have a token, or none
+		if route.Anonymous {
+			operation.Security = []map[string][]string{{}, {"bearerAuth": {}}}
 		}
 	}
 	if collection.Get != nil || collection.Put != nil {
@@ -525,8 +552,15 @@ type openAPIDocument struct {
 	Info       openAPIInfo                 `json:"info"`
 	Servers    []openAPIServer             `json:"servers,omitempty"`
 	Tags       []openAPITag                `json:"tags,omitempty"`
+	Security   []map[string][]string       `json:"security,omitempty"`
 	Paths      map[string]*openAPIPathItem `json:"paths"`
 	Components openAPIComponents           `json:"components"`
+}
+
+type openAPISecurityScheme struct {
+	Type         string `json:"type"`
+	Scheme       string `json:"scheme"`
+	BearerFormat string `json:"bearerFormat,omitempty"`
 }
 
 type openAPIInfo struct {
@@ -544,8 +578,9 @@ type openAPITag struct {
 }
 
 type openAPIComponents struct {
-	Schemas   map[string]*openAPISchema   `json:"schemas"`
-	Responses map[string]*openAPIResponse `json:"responses"`
+	Schemas         map[string]*openAPISchema         `json:"schemas"`
+	Responses       map[string]*openAPIResponse       `json:"responses"`
+	SecuritySchemes map[string]*openAPISecurityScheme `json:"securitySchemes,omitempty"`
 }
 
 type openAPIPathItem struct {
@@ -561,6 +596,7 @@ type openAPIOperation struct {
 	Summary     string                      `json:"summary,omitempty"`
 	Parameters  []*openAPIParameter         `json:"parameters,omitempty"`
 	RequestBody *openAPIRequestBody         `json:"requestBody,omitempty"`
+	Security    []map[string][]string       `json:"security,omitempty"`
 	Responses   map[string]*openAPIResponse `json:"responses"`
 }
 
